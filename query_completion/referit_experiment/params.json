@@ -1,0 +1,1 @@
+{"user_embed_size": 10, "use_mikolov_adaptation": false, "iters": 50000, "dropout": 1.0, "use_lowrank_adaptation": true, "rank": 5, "batch_size": 48, "max_len": 40, "use_layer_norm": true, "use_time_features": false, "num_units": 600, "char_embed_size": 24}

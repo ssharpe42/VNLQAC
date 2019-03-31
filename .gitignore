@@ -1,0 +1,17 @@
+data/*.gz
+.migrate*
+*~
+*.pyc
+settings/
+
+.idea/
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+#Data
+data/*
+*.txt
+*.jpg
+
