@@ -1,8 +1,5 @@
-data/*.gz
-.migrate*
-*~
+
 *.pyc
-settings/
 
 .idea/
 .DS_Store
@@ -11,17 +8,16 @@ settings/
 .ipynb_checkpoints
 
 #Data
-data/*.txt
 *.jpg
 *.tfmodel
 
 venv/
 
-query_completion/g23b/
-query_completion/coco_experiment/
-query_completion/data/coco/
-query_completion/output
-query_completion/data/coco/*.json
-query_completion/data/coco/*.txt
-query_completion/data/referit/*.json
-query_completion/data/referit/*.txt
+
+g23b/
+coco_experiment/
+coco/
+output/
+
+#query_completion/data/referit/*.json
+#query_completion/data/referit/*.txt

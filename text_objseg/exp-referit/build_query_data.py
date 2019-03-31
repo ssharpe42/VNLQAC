@@ -24,7 +24,6 @@ vocab_file = './exp-referit/data/vocabulary_referit.txt'
 # Saving directory
 query_data_folder = './exp-referit/data/referit_query_data/'
 
-
 # Model Params
 T = 20
 N = 100
