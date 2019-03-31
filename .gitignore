@@ -1,23 +1,36 @@
-
+*.mat
+*.h5
 *.pyc
-
-.idea/
+*.npy
+*.npz
+*-checkpoint.ipynb
+*~
+*.swp
 .DS_Store
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-#Data
-*.jpg
-*.tfmodel
+.idea/
 
 venv/
 
+text_objseg/exp-*/data/refer*
+text_objseg/exp-*/log/*
+#text_objseg/exp-*/results*/*
+text_objseg/exp-*/caffemodel/*
+text_objseg/exp-*/tfmodel/*
+#text_objseg/exp-*/__obsolete__/*
+text_objseg/exp-referit/referit-dataset/images
+text_objseg/exp-referit/referit-dataset/mask
+text_objseg/exp-referit/referit-dataset/*.gz
 
-g23b/
-coco_experiment/
-coco/
-output/
 
-#query_completion/data/referit/*.json
-#query_completion/data/referit/*.txt
+query_completion/data/coco
+query_completion/coco*
+query_completion/g23b
+query_completion/output
+
+*.caffemodel
+*.tfmodel*
+
+*-Copy*.ipynb
+
+checkpoint
+

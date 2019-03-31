@@ -1,9 +1,0 @@
-data/*.gz
-.migrate*
-*~
-*.pyc
-settings/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
