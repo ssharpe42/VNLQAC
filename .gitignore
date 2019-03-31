@@ -4,14 +4,13 @@
 *.npy
 *.npz
 *-checkpoint.ipynb
-*~
 *.swp
 .DS_Store
 .idea/
 
 venv/
 
-text_objseg/exp-*/data/refer*
+text_objseg/exp-*/data/refer*/
 text_objseg/exp-*/log/*
 #text_objseg/exp-*/results*/*
 text_objseg/exp-*/caffemodel/*
