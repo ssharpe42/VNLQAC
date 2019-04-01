@@ -16,17 +16,17 @@ Expressions
 
 
 
-This repo contains code for building an LSTM LM for personalized query auto-completion. The model along with experimental results and baselines are described in our 2018 ACL paper, currently available on arXiv. https://arxiv.org/pdf/1804.09661.pdf
-
 
 ### Currently Implemented
 
-Train a query model using 
+Train a query model with ReferIt captions using 
 
 `
-python code/trainer.py 
+python query_completion/code/trainer.py 
 `
 Set hyperparameters following the format in `default_params.json`.
+
+User embeddings currently locked, set to 0, and not trained.
 
 Description of code files:
 * beam.py - helper code for doing beam search
