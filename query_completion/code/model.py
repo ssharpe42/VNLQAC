@@ -1,6 +1,13 @@
 import os
 
 import tensorflow as tf
+import sys
+import os
+
+#sys.path.append('../../text_objseg/')
+from util.cnn import *
+import vgg_net
+
 
 import helper
 from factorcell import FactorCell
@@ -17,9 +24,9 @@ class MetaModel(object):
         # mapping of characters to indices
         self.char_vocab = Vocab.Load(os.path.join(expdir, 'char_vocab.pickle'))
         # mapping of user ids to indices
-        self.user_vocab = Vocab.Load(os.path.join(expdir, 'user_vocab.pickle'))
+        #self.user_vocab = Vocab.Load(os.path.join(expdir, 'user_vocab.pickle'))
         self.params.vocab_size = len(self.char_vocab)
-        self.params.user_vocab_size = len(self.user_vocab)
+        #self.params.user_vocab_size = len(self.user_vocab)
 
         # construct the tensorflow graph
         self.graph = tf.Graph()
@@ -66,7 +73,7 @@ class Model(object):
     def BuildGraph(self, params, training_mode=True, optimizer=None):
         self.queries = tf.placeholder(tf.int32, [None, params.max_len], name='queries')
         self.query_lengths = tf.placeholder(tf.int32, [None], name='query_lengths')
-        self.user_ids = tf.placeholder(tf.int32, [None], name='user_ids')
+        self.images = tf.placeholder(tf.float32, [None, 512, 512, 3])
 
         x = self.queries[:, :-1]  # strip off the end of query token
         y = self.queries[:, 1:]  # need to predict y from x
@@ -74,8 +81,7 @@ class Model(object):
         self.char_embeddings = tf.get_variable(
             'char_embeddings', [params.vocab_size, params.char_embed_size])
         self.char_bias = tf.get_variable('char_bias', [params.vocab_size])
-        self.user_embed_mat = tf.get_variable(  # this defines the user embeddings
-            'user_embed_mat', [params.user_vocab_size, params.user_embed_size], initializer=tf.zeros_initializer())
+        self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',apply_dropout=False,initialize = False)
 
         inputs = tf.nn.embedding_lookup(self.char_embeddings, x)
 
@@ -85,11 +91,9 @@ class Model(object):
                          tf.zeros_like(x, dtype=tf.float32))
         self.dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='keep_prob')
 
-        user_embeddings = tf.nn.embedding_lookup(self.user_embed_mat, self.user_ids)
-
         with tf.variable_scope('rnn'):
             self.decoder_cell = FactorCell(params.num_units, params.char_embed_size,
-                                           user_embeddings,
+                                           self.vgg_feat,
                                            bias_adaptation=params.use_mikolov_adaptation,
                                            lowrank_adaptation=params.use_lowrank_adaptation,
                                            rank=params.rank,
@@ -127,11 +131,13 @@ class Model(object):
         # if training_mode:
         #   self.train_op = optimizer.minimize(self.avg_loss)
         #
-        # don't train user embeddings
+
+        # don't train conv layers
         if training_mode:
             tvars = tf.trainable_variables()
-            non_user_vars = [var for var in tvars if 'user' not in var.name]
-            self.train_op = optimizer.minimize(self.avg_loss, var_list=non_user_vars)
+            #non_user_vars = [var for var in tvars if 'user' not in var.name]
+            non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
+            self.train_op = optimizer.minimize(self.avg_loss, var_list=non_vgg_conv_vars)
 
     def BuildDecoderGraph(self):
         """This part of the graph is only used for evaluation.
@@ -150,8 +156,10 @@ class Model(object):
         prev_embed = tf.nn.embedding_lookup(self.char_embeddings, self.prev_word)
 
         state = tf.nn.rnn_cell.LSTMStateTuple(prev_c, prev_h)
+        # result, (next_c, next_h) = self.decoder_cell(
+        #     prev_embed, state, use_locked=True)
         result, (next_c, next_h) = self.decoder_cell(
-            prev_embed, state, use_locked=True)
+            prev_embed, state, use_locked=False)
         self.next_hidden_state = tf.concat([next_c, next_h], 1)
 
         with tf.variable_scope('rnn', reuse=True):

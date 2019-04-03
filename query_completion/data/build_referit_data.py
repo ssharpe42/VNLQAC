@@ -10,7 +10,8 @@ import skimage.io
 import skimage.transform
 
 #file_dir = os.path.dirname(os.path.abspath(__file__))
-file_dir = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/query_completion/data'
+file_dir = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/data'
+os.chdir(file_dir)
 text_objseg_location = os.path.normpath(os.path.join(file_dir, '../../text_objseg/'))
 sys.path.insert(0, text_objseg_location)
 
@@ -27,11 +28,13 @@ val_query_file =os.path.join(text_objseg_location,'exp-referit/data/referit_quer
 imsize_file = os.path.join(text_objseg_location,'exp-referit/data/referit_imsize.json')
 
 # Saving directory
-query_data_folder = 'data/referit'
+query_data_folder = 'referit'
+train_img_folder = 'referit/img_train'
+val_img_folder = 'referit/img_val'
 
 # Model Params
 T = 20
-N = 100
+N = 1
 input_H = 512;
 featmap_H = (input_H // 32)
 input_W = 512;
@@ -91,15 +94,36 @@ train_df.to_csv(os.path.join(query_data_folder, 'train_queries.txt'), sep='\t', 
 val_df = pd.DataFrame({'queries': val_queries, 'images': val_images})
 val_df.to_csv(os.path.join(query_data_folder, 'val_queries.txt'), sep='\t', encoding='utf-8', index=False)
 
-#
-# images = np.unique(images)
-# for i in range(len(images)):
-#     print('saving img {}: {}'.format(i,images[i]))
-#     imname, description = queries.iloc[i]
-#     im = skimage.io.imread(image_dir + imname)
-#
-#     processed_im = skimage.img_as_ubyte(im_processing.resize_and_pad(im, input_H, input_W))
-#     if processed_im.ndim == 2:
-#         processed_im = processed_im[:, :, np.newaxis]
-#
-#     np.save(file=query_data_folder + imname[:-4] + '.npy', arr=processed_im)
+################################################################################
+# Process images
+################################################################################
+if not os.path.isdir(train_img_folder):
+    os.mkdir(train_img_folder)
+if not os.path.isdir(val_img_folder):
+    os.mkdir(val_img_folder)
+
+
+train_images = np.unique(train_df.images)
+for i in range(len(train_images)):
+    print('saving img {}: {}'.format(i,train_images[i]))
+    imname = train_images[i]
+    im = skimage.io.imread(image_dir + imname)
+
+    processed_im = skimage.img_as_ubyte(im_processing.resize_and_pad(im, input_H, input_W))
+    if processed_im.ndim == 2:
+        processed_im = processed_im[:, :, np.newaxis]
+
+    np.save(file=os.path.join(train_img_folder , imname[:-4] + '.npy'), arr=processed_im)
+
+
+val_images = np.unique(val_df.images)
+for i in range(len(val_images)):
+    print('saving img {}: {}'.format(i,val_images[i]))
+    imname = val_images[i]
+    im = skimage.io.imread(image_dir + imname)
+
+    processed_im = skimage.img_as_ubyte(im_processing.resize_and_pad(im, input_H, input_W))
+    if processed_im.ndim == 2:
+        processed_im = processed_im[:, :, np.newaxis]
+
+    np.save(file=os.path.join(val_img_folder , imname[:-4] + '.npy'), arr=processed_im)

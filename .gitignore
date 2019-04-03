@@ -25,9 +25,11 @@ query_completion/data/coco
 query_completion/coco*
 query_completion/g23b
 query_completion/output
+query_completion/archive
 
 *.caffemodel
 *.tfmodel*
+*.zip
 
 *-Copy*.ipynb
 
