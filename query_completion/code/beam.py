@@ -6,15 +6,30 @@ from Queue import PriorityQueue
 
 import numpy as np
 
+#
+# def InitBeam(phrase, m):
+#   # Need to find the hidden state for the last char in the prefix.
+#   prev_hidden = np.zeros((1, 2 * m.params.num_units))
+#   for word in phrase[:-1]:
+#     feed_dict = {
+#        m.model.prev_hidden_state: prev_hidden,
+#        m.model.prev_word: [m.char_vocab[word]],
+#        m.model.beam_size: 4
+#     }
+#     prev_hidden = m.session.run(m.model.next_hidden_state, feed_dict)
+#
+#   return prev_hidden
 
-def InitBeam(phrase, user_id, m):
+
+def InitBeam(phrase, m, vgg_feat):
   # Need to find the hidden state for the last char in the prefix.
   prev_hidden = np.zeros((1, 2 * m.params.num_units))
   for word in phrase[:-1]:
     feed_dict = {
        m.model.prev_hidden_state: prev_hidden,
        m.model.prev_word: [m.char_vocab[word]],
-       m.model.beam_size: 4
+       m.model.beam_size: 4,
+       m.model.vgg_feat: vgg_feat
     }
     prev_hidden = m.session.run(m.model.next_hidden_state, feed_dict)
 
@@ -79,12 +94,12 @@ class BeamQueue(object):
     return self.__next__()
 
 
-def GetCompletions(prefix, user_id, m, branching_factor=8, beam_size=300, 
+def GetCompletions(prefix, image_feat, m, branching_factor=8, beam_size=300,
                    stop='</S>'):
   """ Find top completions for a given prefix, user and model."""
-  m.Lock(user_id)  # pre-compute the adaptive recurrent matrix
+  #m.Lock(image)  # pre-compute the adaptive recurrent matrix
 
-  prev_state = InitBeam(prefix, user_id, m)
+  prev_state = InitBeam(prefix, m, image_feat)
   nodes = [BeamItem(prefix, prev_state)]
 
   for i in range(36):
@@ -132,7 +147,7 @@ def FirstNonMatch(s1, s2, start=0):
   return min_len
 
     
-def GetSavedKeystrokes(m, query, branching_factor=4, beam_size=100):
+def GetSavedKeystrokes(m, query, vgg_feat, branching_factor=4, beam_size=100):
   """Find the shortest prefix that gets the right completion.
 
   Uses binary search.
@@ -143,7 +158,7 @@ def GetSavedKeystrokes(m, query, branching_factor=4, beam_size=100):
     midpoint = (left + right) / 2
     prefix = ['<S>'] + list(query[:midpoint])
     completions = GetCompletions(
-      prefix, 0, m, branching_factor=branching_factor, beam_size=beam_size)
+      prefix, vgg_feat, m, branching_factor=branching_factor, beam_size=beam_size)
     top_completion = list(completions)[-1]
     top_completion = ''.join(top_completion.words[1:-1])
     if top_completion == query:

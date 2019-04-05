@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 import sys
-import os
+import numpy as np
 
 #sys.path.append('../../text_objseg/')
 from util.cnn import *
@@ -27,7 +27,6 @@ class MetaModel(object):
         #self.user_vocab = Vocab.Load(os.path.join(expdir, 'user_vocab.pickle'))
         self.params.vocab_size = len(self.char_vocab)
         #self.params.user_vocab_size = len(self.user_vocab)
-
         # construct the tensorflow graph
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -35,10 +34,16 @@ class MetaModel(object):
             self.char_tensor = tf.constant(self.char_vocab.GetWords(), name='char_tensor')
             self.beam_chars = tf.nn.embedding_lookup(self.char_tensor, self.model.selected)
 
-    def Lock(self, user_id=0):
+    def Lock(self, image):
         """Locking precomputes the adaptation for a given user."""
         self.session.run(self.model.decoder_cell.lock_op,
-                         {self.model.user_ids: [user_id]})
+                         {self.model.images: image[np.newaxis,:]})
+
+    def ComputeVGG(self, image):
+
+        self.Lock(image)
+
+        return self.session.run(self.model.vgg_feat, {self.model.images: image[np.newaxis,:]})
 
     def MakeSession(self, threads=8):
         """Create the session with the given number of threads."""
@@ -63,8 +68,9 @@ class Model(object):
     """Defines the Tensorflow graph for training and testing a model."""
 
     def __init__(self, params, training_mode=True, optimizer=tf.train.AdamOptimizer,
-                 learning_rate=0.001):
+                 learning_rate=0.001,only_char = False):
         self.params = params
+        self.only_char = only_char
         opt = optimizer(learning_rate)
         self.BuildGraph(params, training_mode=training_mode, optimizer=opt)
         if not training_mode:
@@ -73,17 +79,28 @@ class Model(object):
     def BuildGraph(self, params, training_mode=True, optimizer=None):
         self.queries = tf.placeholder(tf.int32, [None, params.max_len], name='queries')
         self.query_lengths = tf.placeholder(tf.int32, [None], name='query_lengths')
-        self.images = tf.placeholder(tf.float32, [None, 512, 512, 3])
+
 
         x = self.queries[:, :-1]  # strip off the end of query token
         y = self.queries[:, 1:]  # need to predict y from x
 
-        self.char_embeddings = tf.get_variable(
-            'char_embeddings', [params.vocab_size, params.char_embed_size])
-        self.char_bias = tf.get_variable('char_bias', [params.vocab_size])
-        self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',apply_dropout=False,initialize = False)
+        with tf.variable_scope('char'):
+            self.char_embeddings = tf.get_variable(
+                'char_embeddings', [params.vocab_size, params.char_embed_size])
+            self.char_bias = tf.get_variable('char_bias', [params.vocab_size])
 
         inputs = tf.nn.embedding_lookup(self.char_embeddings, x)
+
+        if self.only_char:
+            self.images = tf.placeholder(tf.float32, [None, params.image_feat_size])
+            self.vgg_placeholder = tf.get_variable("vgg_placeholder", [params.image_feat_size,params.image_feat_size], initializer=tf.zeros_initializer())
+            self.vgg_feat = tf.matmul(self.images, self.vgg_placeholder)
+            print(self.vgg_feat.get_shape().as_list())
+        else:
+            self.images = tf.placeholder(tf.float32, [None, 512, 512, 3])
+            #self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',apply_dropout=False,initialize = False)
+            self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',output_dim=128, initialize = False)
+
 
         # create a mask to zero out the loss for the padding tokens
         indicator = tf.sequence_mask(self.query_lengths - 1, params.max_len - 1)
@@ -135,8 +152,10 @@ class Model(object):
         # don't train conv layers
         if training_mode:
             tvars = tf.trainable_variables()
-            #non_user_vars = [var for var in tvars if 'user' not in var.name]
-            non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
+            if self.only_char:
+                non_vgg_conv_vars = [var for var in tvars if 'vgg' not in var.name]
+            else:
+                non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
             self.train_op = optimizer.minimize(self.avg_loss, var_list=non_vgg_conv_vars)
 
     def BuildDecoderGraph(self):
@@ -159,7 +178,7 @@ class Model(object):
         # result, (next_c, next_h) = self.decoder_cell(
         #     prev_embed, state, use_locked=True)
         result, (next_c, next_h) = self.decoder_cell(
-            prev_embed, state, use_locked=False)
+            prev_embed, state, use_locked=True)
         self.next_hidden_state = tf.concat([next_c, next_h], 1)
 
         with tf.variable_scope('rnn', reuse=True):

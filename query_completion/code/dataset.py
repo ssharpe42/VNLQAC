@@ -36,7 +36,7 @@ def LoadData(filenames, split=True):
 def LoadReferItData(filename, split=True):
     """Load a bunch of files as a pandas dataframe.
 
-    Input files should have three columns for userid, query, and date.
+    Input files should have two columns for userid, query
     """
 
     def Prepare(s):
@@ -90,13 +90,14 @@ class Dataset(object):
 
 class ReferItDataset(object):
 
-    def __init__(self, df, char_vocab, batch_size=24, max_len=60, image_dir = ''):
+    def __init__(self, df, char_vocab, batch_size=24, max_len=60, image_dir = '', only_char = False):
         self.max_len = max_len
         self.char_vocab = char_vocab
         self.df = df.sample(frac=1)
         self.batch_size = batch_size
         self.current_idx = 0
         self.image_dir = image_dir
+        self.only_char = only_char
         self.df['lengths'] = self.df.query_.apply(
             lambda x: min(self.max_len, len(x)))
 
@@ -108,25 +109,40 @@ class ReferItDataset(object):
         self.current_idx += self.batch_size
 
         grp = self.df.iloc[idx]
-        grp.images = grp.images.str.replace('.jpg','.npy').values
-
         f1 = np.zeros((self.batch_size, self.max_len))
-        img_mat = np.zeros((self.batch_size, 512, 512, 3))
 
-        for i in xrange(len(grp)):
+        if self.only_char:
+            img_mat = np.zeros((self.batch_size, 128))
+            for i in xrange(len(grp)):
 
-            row = grp.iloc[i]
-            img = np.load(os.path.join(self.image_dir, row.images))
-            img_mat[i,] = img
-            for j in range(row.lengths):
-                f1[i, j] = self.char_vocab[row.query_[j]]
+                row = grp.iloc[i]
+                for j in range(row.lengths):
+                    f1[i, j] = self.char_vocab[row.query_[j]]
 
-        img_mat = img_mat - channel_mean
-        feed_dict = {
-            model.queries: f1,
-            model.query_lengths: grp.lengths.values,
-            model.images: img_mat,
-        }
+            feed_dict = {
+                model.queries: f1,
+                model.query_lengths: grp.lengths.values,
+                model.images: img_mat,
+            }
+
+
+        else:
+            grp.images = grp.images.str.replace('.jpg', '.npy').values
+            img_mat = np.zeros((self.batch_size, 512, 512, 3))
+            for i in xrange(len(grp)):
+
+                row = grp.iloc[i]
+                img = np.load(os.path.join(self.image_dir, row.images))
+                img_mat[i,] = img
+                for j in range(row.lengths):
+                    f1[i, j] = self.char_vocab[row.query_[j]]
+
+            img_mat = img_mat - channel_mean
+            feed_dict = {
+                model.queries: f1,
+                model.query_lengths: grp.lengths.values,
+                model.images: img_mat,
+            }
 
 
         return feed_dict

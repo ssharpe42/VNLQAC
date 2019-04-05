@@ -79,6 +79,12 @@ def pooling_layer(name, bottom, kernel_size, stride):
         strides=[1, stride, stride, 1], padding='SAME', name=name)
     return pool
 
+def global_avg_pooling_layer(bottom):
+    global_pool = tf.reduce_mean(bottom, [1, 2])
+
+    print(global_pool.get_shape().as_list())
+    return global_pool
+
 def fc_layer(name, bottom, output_dim, bias_term=True, weights_initializer=None,
              biases_initializer=None):
     # flatten bottom input

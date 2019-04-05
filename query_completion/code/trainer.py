@@ -10,11 +10,11 @@ import tensorflow as tf
 
 import sys
 #file_path = os.path.dirname(__file__)
-#file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/code_img'
-
-#os.chdir('/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion')
-#sys.path.insert(0,'code_img')
-#pd.options.display.max_columns = 100
+# file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/code_img'
+#
+# os.chdir('/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion')
+# sys.path.insert(0,'code')
+# pd.options.display.max_columns = 100
 
 import helper
 from dataset import Dataset, LoadData, LoadReferItData,ReferItDataset
@@ -39,14 +39,12 @@ from vocab import Vocab
 # args = parser.parse_args()
 
 threads = 2
+only_char = True
 params = 'code/default_params.json'
 train_data = 'data/referit/train_queries.txt'
 val_data = 'data/referit/val_queries.txt'
 train_img_dir = 'data/referit/img_train/'
 val_img_dir = 'data/referit/img_val/'
-# train_data = 'data/coco/train_queries.txt'
-# val_data = 'data/coco/val_queries.txt'
-
 
 #expdir = args.expdir
 expdir = 'referit_experiment_img'
@@ -72,13 +70,15 @@ char_vocab.Save(os.path.join(expdir, 'char_vocab.pickle'))
 params.vocab_size = len(char_vocab)
 dataset = ReferItDataset(df, char_vocab, max_len=params.max_len,
                         batch_size=params.batch_size,
-                         image_dir = train_img_dir)
+                         image_dir = train_img_dir,
+                         only_char=only_char)
 
 val_df = LoadReferItData(val_data)
 valdata = ReferItDataset(val_df, char_vocab,  max_len=params.max_len,
-                  batch_size=params.batch_size, image_dir = val_img_dir)
+                  batch_size=params.batch_size, image_dir = val_img_dir,
+                         only_char=only_char)
 
-model = Model(params)
+model = Model(params,only_char=only_char)
 saver = tf.train.Saver(tf.global_variables())
 config = tf.ConfigProto(inter_op_parallelism_threads=threads,
                         intra_op_parallelism_threads=threads,
@@ -102,22 +102,25 @@ for name in vgg_W:
         print(weight)
         session.run(weight.assign(vgg_W[name]))
 
+# char_vars = [v for v in tf.global_variables() if v.name in ['char_embeddings:0','char_bias:0']]
+# saver2 = tf.train.Saver(char_vars)
+# saver2.restore(session,'/Users/Sam/Desktop/referit_experiment/model.bin')
 
 avg_loss = MovingAvg(0.97)  # exponential moving average of the training loss
-avg_val_loss = MovingAvg(0.97)  # exponential moving average of the training loss
+#avg_val_loss = MovingAvg(0.97)  # exponential moving average of the val loss
 for idx in range(params.iters):
   feed_dict = dataset.GetFeedDict(model, channel_mean=channel_mean)
   feed_dict[model.dropout_keep_prob] = params.dropout
 
   c, _ = session.run([model.avg_loss, model.train_op], feed_dict)
   cc = avg_loss.Update(c)
-  if idx % 50 == 0 and idx > 0:
+  if idx % 50 ==0:
+      print('Iter: {}'.format(idx))
+  if idx % 200 == 0 and idx > 0:
     # test one batch from the validation set
     val_c = session.run(model.avg_loss, valdata.GetFeedDict(model,channel_mean=channel_mean))
-    vc = avg_val_loss.Update(val_c)
-    logging.info({'iter': idx, 'cost': cc, 'rawcost': c,
-                  'rawvalcost': val_c,'valcost':vc})
-  if idx % 500 == 0:  # save a model file every 500 minibatches
+    logging.info({'iter': idx, 'cost': cc, 'rawcost': c,'rawvalcost': val_c})
+  if idx % 2000 == 0:  # save a model file every 500 minibatches
     saver.save(session, os.path.join(expdir, 'model.bin'),
                write_meta_graph=False)
 
