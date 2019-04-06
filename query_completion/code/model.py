@@ -99,7 +99,7 @@ class Model(object):
         else:
             self.images = tf.placeholder(tf.float32, [None, 512, 512, 3])
             #self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',apply_dropout=False,initialize = False)
-            self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',output_dim=128, initialize = False)
+            self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',output_dim=params.image_feat_size, initialize = False)
 
 
         # create a mask to zero out the loss for the padding tokens
@@ -179,6 +179,7 @@ class Model(object):
         #     prev_embed, state, use_locked=True)
         result, (next_c, next_h) = self.decoder_cell(
             prev_embed, state, use_locked=True)
+
         self.next_hidden_state = tf.concat([next_c, next_h], 1)
 
         with tf.variable_scope('rnn', reuse=True):
