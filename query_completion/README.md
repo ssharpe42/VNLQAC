@@ -1,10 +1,10 @@
-# Personalized Query Completion
+# Image Query Completion
 
-This repo contains code for building an LSTM LM for personalized query auto-completion. The model along with experimental results and baselines are described in our 2018 ACL paper, currently available on arXiv. https://arxiv.org/pdf/1804.09661.pdf
+This repo contains code for building an LSTM LM for query auto-completion with image as context.
 
-Train a model using
-`
-python code/trainer.py 
+Train a query model with ReferIt captions using 
+
+python query_completion/code/trainer.py 
 `
 Set hyperparameters following the format in `default_params.json`.
 
@@ -13,8 +13,4 @@ Description of code files:
 * factorcell.py - implementation of the FactorCell recurrent layer
 * model.py - defines the Tensorflow graph for the language model
 * trainer.py - script for training a new langauge model
-* dynamic.py - script for evaluating trained model on new users
-
-New files for ReferIt:
-* build_referit_data.py - preprocess referit queries to feed to LSTM
-* build_coco_data.py - preprocess mscoco queries to feed to LSTM
+* data/build_referit_data.py - preprocess referit queries to feed to LSTM
