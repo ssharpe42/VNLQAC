@@ -33,8 +33,6 @@ train_img_folder = 'referit/img_train'
 val_img_folder = 'referit/img_val'
 
 # Model Params
-T = 20
-N = 1
 input_H = 512;
 featmap_H = (input_H // 32)
 input_W = 512;

@@ -25,18 +25,18 @@ from util import im_processing, text_processing
 # Parameters
 ################################################################################
 
-image_dir = os.path.join('visual_biome/images/')
+image_dir = os.path.join('visual/images/')
 
 # Saving directory
-query_data_folder = 'visual_biome'
-processed_img_folder = 'visual_biome/processed_images'
+query_data_folder = 'visual'
+processed_img_folder = 'visual/processed_images_224'
 ################################################################################
 # Load annotations
 ################################################################################
 
 images = glob.glob(image_dir+ '*.jpg')
 image_ids = [int(re.search('[0-9]+',x).group()) for x in images]
-f = open('visual_biome/region_graphs.json','r')
+f = open('visual/region_graphs.json','r')
 
 VB_data = {'image_id':[],'query':[],'class':[],'x':[],'y': [],'h': [],'w': []}
 
@@ -67,7 +67,7 @@ VB_class_instances = VB_df[~VB_df.duplicated(['image_id','class','x','y','w','h'
 
 
 #Write Query --> Class to csv
-VB_query_classes.to_pickle(os.path.join(query_data_folder,'query_classes.pkl'))
+VB_query_classes.to_csv(os.path.join(query_data_folder,'query_classes.txt'), sep='\t', index = False, encoding = 'utf-8')
 
 
 #Keep images with at least 40 queries
@@ -78,8 +78,8 @@ train_images, val_images = train_test_split(sufficient_image_ids, test_size=.15,
 train_image_queries = VB_image_query[VB_image_query.image_id.isin(train_images)]
 val_image_queries = VB_image_query[VB_image_query.image_id.isin(val_images)]
 
-train_image_queries.to_pickle(os.path.join(query_data_folder,'train_image_queries.pkl'))
-val_image_queries.to_pickle(os.path.join(query_data_folder,'val_image_queries.pkl'))
+train_image_queries.to_csv(os.path.join(query_data_folder,'train_image_queries.txt'), sep='\t',index = False, encoding = 'utf-8')
+val_image_queries.to_csv(os.path.join(query_data_folder,'val_image_queries.txt'),sep='\t', index = False, encoding = 'utf-8')
 
 
 ################################################################################
@@ -90,8 +90,8 @@ if not os.path.isdir(processed_img_folder):
 
 
 # Model Params
-input_H = 512
-input_W = 512
+input_H = 224
+input_W = 224
 
 images = np.unique(VB_image_query.image_id)
 for i in range(len(images)):

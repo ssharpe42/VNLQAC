@@ -9,8 +9,10 @@ from util.cnn import conv_layer as conv
 from util.cnn import conv_relu_layer as conv_relu
 from util.cnn import pooling_layer as pool
 from util.cnn import global_avg_pooling_layer as gap_pool
+from util.cnn import feature_avg_pooling_layer as fap_pool
 from util.cnn import fc_layer as fc
 from util.cnn import fc_relu_layer as fc_relu
+from util.cnn import fc_relu_droput_layer as fc_relu_do
 
 channel_mean = np.array([123.68, 116.779, 103.939], dtype=np.float32)
 
@@ -55,7 +57,7 @@ def vgg_pool5(input_batch, name, initialize = True):
         pool5 = pool('pool5', conv5_3, kernel_size=2, stride=2)
         return pool5
 
-def vgg_gap5(input_batch, name, initialize = True):
+def vgg_conv(input_batch, name, initialize = True):
 
     with tf.variable_scope(name):
         # layer 1
@@ -93,14 +95,12 @@ def vgg_gap5(input_batch, name, initialize = True):
                             kernel_size=3, stride=1, output_dim=512, initialize = initialize)
         conv5_3 = conv_relu('conv5_3', conv5_2,
                             kernel_size=3, stride=1, output_dim=512, initialize = initialize)
-        pool5 = gap_pool(conv5_3)
         return conv5_3
 
 def vgg_fc7(input_batch, name, apply_dropout, initialize = True):
     pool5 = vgg_pool5(input_batch, name, initialize=initialize)
     with tf.variable_scope(name):
         # layer 6
-        print(pool5.get_shape())
         fc6 = fc_relu('fc6', pool5, output_dim=4096)
         if apply_dropout: fc6 = drop(fc6, 0.5)
         # layer 7
@@ -134,11 +134,28 @@ def vgg_fc8_full_conv(input_batch, name, apply_dropout, output_dim=1000, initial
         return fc8
 
 
-def vgg_gap_fc(input_batch, name,output_dim=128, initialize = True):
-    pool5 = vgg_gap5(input_batch, name, initialize=initialize)
+def vgg_gap_fc(input_batch, name, keep_prob,output_dim=128, initialize = True ):
+    pool5 = gap_pool(vgg_conv(input_batch, name, initialize=initialize))
     with tf.variable_scope(name):
         # layer 6
         print(pool5.get_shape())
-        fc6 = fc_relu('fc6', pool5, output_dim=output_dim)
+        fc6 = fc_relu_do('fc6', pool5, output_dim=output_dim, keep_prob = keep_prob)
+        return fc6
+
+def vgg_fap_fc(input_batch, name, keep_prob, output_dim=128, initialize = True):
+    pool5 = fap_pool(vgg_conv(input_batch, name, initialize=initialize))
+    with tf.variable_scope(name):
+        # layer 6
+        print(pool5.get_shape())
+        fc6 = fc_relu_do('fc6', pool5, output_dim=output_dim, keep_prob = keep_prob)
+        return fc6
+
+
+def vgg_fc(input_batch, name,keep_prob, output_dim=128, initialize = True):
+    conv5 = vgg_conv(input_batch, name, initialize=initialize)
+    with tf.variable_scope(name):
+        # layer 6
+        print(conv5.get_shape())
+        fc6 = fc_relu_do('fc6', conv5, output_dim=output_dim, keep_prob = keep_prob)
         return fc6
 

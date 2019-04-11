@@ -85,6 +85,12 @@ def global_avg_pooling_layer(bottom):
     print(global_pool.get_shape().as_list())
     return global_pool
 
+def feature_avg_pooling_layer(bottom):
+    feature_pool = tf.reduce_mean(bottom, 3)
+
+    print(feature_pool.get_shape().as_list())
+    return feature_pool
+
 def fc_layer(name, bottom, output_dim, bias_term=True, weights_initializer=None,
              biases_initializer=None):
     # flatten bottom input
@@ -118,6 +124,15 @@ def fc_layer(name, bottom, output_dim, bias_term=True, weights_initializer=None,
 def fc_relu_layer(name, bottom, output_dim, bias_term=True,
                   weights_initializer=None, biases_initializer=None):
     fc = fc_layer(name, bottom, output_dim, bias_term, weights_initializer,
+                  biases_initializer)
+    relu = tf.nn.relu(fc)
+    return relu
+
+def fc_relu_droput_layer(name, bottom, output_dim, keep_prob, bias_term=True,
+                  weights_initializer=None, biases_initializer=None):
+
+    fc_dropout = tf.nn.dropout(bottom, keep_prob)
+    fc = fc_layer(name, fc_dropout, output_dim, bias_term, weights_initializer,
                   biases_initializer)
     relu = tf.nn.relu(fc)
     return relu

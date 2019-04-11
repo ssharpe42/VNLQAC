@@ -79,7 +79,8 @@ class Model(object):
     def BuildGraph(self, params, training_mode=True, optimizer=None):
         self.queries = tf.placeholder(tf.int32, [None, params.max_len], name='queries')
         self.query_lengths = tf.placeholder(tf.int32, [None], name='query_lengths')
-
+        self.dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='keep_prob')
+        self.fc_dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='fc_keep_prob')
 
         x = self.queries[:, :-1]  # strip off the end of query token
         y = self.queries[:, 1:]  # need to predict y from x
@@ -97,16 +98,33 @@ class Model(object):
             self.vgg_feat = tf.matmul(self.images, self.vgg_placeholder)
             print(self.vgg_feat.get_shape().as_list())
         else:
-            self.images = tf.placeholder(tf.float32, [None, 512, 512, 3])
-            #self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',apply_dropout=False,initialize = False)
-            self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',output_dim=params.image_feat_size, initialize = False)
+            self.images = tf.placeholder(tf.float32, [None, params.img_size, params.img_size, 3])
+            if params.vgg_feat_type =='full':
+                self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
+                                               apply_dropout=params.apply_dropout,
+                                               output_dim=params.image_feat_size,
+                                               initialize = False)
+            elif params.vgg_feat_type =='fc':
+                self.vgg_feat = vgg_net.vgg_fc(self.images,'vgg_local',
+                                                   keep_prob = self.fc_dropout_keep_prob,
+                                                   output_dim=params.image_feat_size,
+                                                    initialize=False)
+            elif params.vgg_feat_type =='gap':
+                self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',
+                                                   keep_prob = self.fc_dropout_keep_prob,
+                                                   output_dim=params.image_feat_size,
+                                                    initialize=False)
+            elif params.vgg_feat_type =='fap':
+                self.vgg_feat = vgg_net.vgg_fap_fc(self.images, 'vgg_local',
+                                                   keep_prob = self.fc_dropout_keep_prob,
+                                                   output_dim=params.image_feat_size,
+                                                   initialize=False)
 
 
         # create a mask to zero out the loss for the padding tokens
         indicator = tf.sequence_mask(self.query_lengths - 1, params.max_len - 1)
         _mask = tf.where(indicator, tf.ones_like(x, dtype=tf.float32),
                          tf.zeros_like(x, dtype=tf.float32))
-        self.dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='keep_prob')
 
         with tf.variable_scope('rnn'):
             self.decoder_cell = FactorCell(params.num_units, params.char_embed_size,
@@ -154,9 +172,41 @@ class Model(object):
             tvars = tf.trainable_variables()
             if self.only_char:
                 non_vgg_conv_vars = [var for var in tvars if 'vgg' not in var.name]
-            else:
+            elif params.vgg_feat_type != 'full':
                 non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
+            else:
+                # non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
+                non_vgg_conv_vars = filter(lambda x: not x.startswith(('vgg_local/conv','vgg_local/fc6','vgg_local/fc7')),
+                                           [var.name for var in tvars])
+                non_vgg_conv_vars = [var for var in tvars if var.name in non_vgg_conv_vars]
             self.train_op = optimizer.minimize(self.avg_loss, var_list=non_vgg_conv_vars)
+
+
+    def LoadVGG(self, session, pretrained_path = ''):
+
+        vgg_weights = np.load(pretrained_path)
+
+        vgg_W = vgg_weights['processed_W'].item()
+        vgg_B = vgg_weights['processed_B'].item()
+
+        if self.params.vgg_feat_type!='full':
+            do_not_load =['fc6','fc7','fc8']
+        else:
+            do_not_load = ['fc8']
+
+        for name in vgg_W:
+            if name not in do_not_load:
+                print(name)
+                weight = [w for w in tf.trainable_variables() if name in w.name and 'weight' in w.name][0]
+                print(weight)
+                session.run(weight.assign(vgg_W[name]))
+
+        for name in vgg_B:
+            if name not in do_not_load:
+                print(name)
+                weight = [w for w in tf.trainable_variables() if name in w.name and 'biases' in w.name][0]
+                print(weight)
+                session.run(weight.assign(vgg_B[name]))
 
     def BuildDecoderGraph(self):
         """This part of the graph is only used for evaluation.

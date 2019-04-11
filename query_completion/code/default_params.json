@@ -1,13 +1,17 @@
 {
+    "img_size":224,
     "max_len": 40,
     "num_units": 512,
     "char_embed_size": 24,
     "image_feat_size": 128,
     "dropout": 1.0,
+    "fc_dropout": 1.0,
+    "apply_dropout":true,
     "use_layer_norm": true,
     "use_mikolov_adaptation": false,
     "use_lowrank_adaptation": true,
     "rank": 64,
     "iters": 50000,
-    "batch_size": 32
+    "batch_size": 3,
+    "vgg_feat_type": "full"
 }

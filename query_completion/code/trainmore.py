@@ -87,16 +87,33 @@ session = tf.Session(config=config)
 session.run(tf.global_variables_initializer())
 saver.restore(session, os.path.join(expdir, 'model.bin'))
 
-avg_loss = MovingAvg(0.97)
-for idx in range(300000):
-  feed_dict = dataset.GetFeedDict(model)
+# avg_loss = MovingAvg(0.97)
+# for idx in range(300000):
+#   feed_dict = dataset.GetFeedDict(model)
+#   feed_dict[model.dropout_keep_prob] = params.dropout
+#   c, _ = session.run([model.avg_loss, model.train_op], feed_dict)
+#   cc = avg_loss.Update(c)
+#   if idx % 20 == 0 and idx > 0:
+#     val_c = session.run(model.avg_loss, valdata.GetFeedDict(model))
+#     logging.info({'iter': idx, 'cost': cc, 'rawcost': c,
+#                   'valcost': val_c})
+#   if idx % 999 == 0:
+#     saver.save(session, os.path.join(expdir, 'model2.bin'),
+#                write_meta_graph=False)
+
+avg_loss = MovingAvg(0.97)  # exponential moving average of the training loss
+avg_val_loss = MovingAvg(0.5)  # exponential moving average of the val loss
+for idx in range(params.iters):
+  feed_dict = dataset.GetFeedDict(model, channel_mean=channel_mean)
   feed_dict[model.dropout_keep_prob] = params.dropout
+
   c, _ = session.run([model.avg_loss, model.train_op], feed_dict)
   cc = avg_loss.Update(c)
-  if idx % 20 == 0 and idx > 0:
-    val_c = session.run(model.avg_loss, valdata.GetFeedDict(model))
-    logging.info({'iter': idx, 'cost': cc, 'rawcost': c,
-                  'valcost': val_c})
-  if idx % 999 == 0:
-    saver.save(session, os.path.join(expdir, 'model2.bin'),
-               write_meta_graph=False)
+  if idx % 50 ==0:
+
+      print('Iter: {}'.format(idx))
+      # test one batch from the validation set
+      val_c = session.run(model.avg_loss, valdata.GetFeedDict(model, channel_mean=channel_mean))
+      vc = avg_val_loss.Update(val_c)
+  if idx % 200 == 0 and idx > 0:
+    logging.info({'iter': idx, 'cost': cc, 'rawcost': c,'rawvalcost': val_c,'valcost': vc})
