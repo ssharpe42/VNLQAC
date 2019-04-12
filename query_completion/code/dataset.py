@@ -146,7 +146,6 @@ class VisualDataset(object):
 
 
         else:
-            print((grp.image_id.astype(str) + '.npy').values)
             grp['images'] = (grp.image_id.astype(str) + '.npy').values
             img_mat = np.zeros((self.batch_size, self.image_size, self.image_size, 3))
             for i in xrange(len(grp)):

@@ -18,8 +18,10 @@ file_dir = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/qu
 os.chdir(file_dir)
 util_location = os.path.normpath(os.path.join(file_dir, '../code/'))
 sys.path.insert(0, util_location)
+sys.path.insert(0, os.getcwd())
 
 from util import im_processing, text_processing
+from segment_everything_classes import segment_classes
 
 ################################################################################
 # Parameters
@@ -61,14 +63,7 @@ for item in ijson.items(f, 'item'):
 
 
 VB_df = pd.DataFrame.from_dict(VB_data)
-VB_query_classes = VB_df[~VB_df.duplicated(['query','class'])][['image_id','query','class']]
 VB_image_query = VB_df[(~VB_df.duplicated(['image_id','query'])) & (VB_df['image_id']!='none')][['image_id','query']]
-VB_class_instances = VB_df[~VB_df.duplicated(['image_id','class','x','y','w','h']) & (VB_df['image_id']!='none')]
-
-
-#Write Query --> Class to csv
-VB_query_classes.to_csv(os.path.join(query_data_folder,'query_classes.txt'), sep='\t', index = False, encoding = 'utf-8')
-
 
 #Keep images with at least 40 queries
 VB_image_query= VB_image_query.groupby('image_id').filter(lambda x: len(x)>=40)
@@ -80,6 +75,18 @@ val_image_queries = VB_image_query[VB_image_query.image_id.isin(val_images)]
 
 train_image_queries.to_csv(os.path.join(query_data_folder,'train_image_queries.txt'), sep='\t',index = False, encoding = 'utf-8')
 val_image_queries.to_csv(os.path.join(query_data_folder,'val_image_queries.txt'),sep='\t', index = False, encoding = 'utf-8')
+
+
+#Keep classes in Learning to Segment Everyting
+VB_df['class'] = VB_df['class'].str.replace('\.[a-z0-9\.]+','')
+VB_df = VB_df[VB_df['class'].isin(segment_classes)]
+VB_query_classes = VB_df[~VB_df.duplicated(['query','class'])][['image_id','query','class']]
+VB_class_instances = VB_df[~VB_df.duplicated(['image_id','class','x','y','w','h']) & (VB_df['image_id']!='none')]
+
+#Write Query --> Class to csv
+VB_query_classes.to_csv(os.path.join(query_data_folder,'query_classes.txt'), sep='\t', index = False, encoding = 'utf-8')
+VB_class_instances.to_csv(os.path.join(query_data_folder,'image_class_instances.txt'), sep='\t', index = False, encoding = 'utf-8')
+
 
 
 ################################################################################

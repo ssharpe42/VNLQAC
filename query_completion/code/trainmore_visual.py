@@ -1,4 +1,3 @@
-
 import argparse
 import logging
 import os
@@ -40,20 +39,13 @@ from vocab import Vocab
 
 threads = 2
 only_char = False
-params = 'code/default_params.json'
+params = 'visual_experiment/params.json'
 train_data = 'data/visual/train_image_queries.txt'
 val_data = 'data/visual/train_image_queries.txt'
 img_dir = 'data/visual/processed_images_224/'
 
-
 #expdir = args.expdir
 expdir = 'visual_experiment'
-if not os.path.exists(expdir):
-  os.mkdir(expdir)
-else:
-  print 'ERROR: expdir already exists'
-  exit(-1)
-
 
 tf.set_random_seed(int(time.time() * 1000))
 
@@ -79,40 +71,17 @@ valdata = VisualDataset(val_df, char_vocab,  max_len=params.max_len,
                   batch_size=params.batch_size, image_dir = img_dir,
                         image_size = params.img_size,
                          only_char=only_char)
-
 model = Model(params,only_char=only_char)
 saver = tf.train.Saver(tf.global_variables())
 config = tf.ConfigProto(inter_op_parallelism_threads=threads,
                         intra_op_parallelism_threads=threads,
-                        allow_soft_placement = True)#,
-                        #log_device_placement=True)
+                        allow_soft_placement = True,
+                        log_device_placement=True)
+
 
 session = tf.Session(config=config)
 session.run(tf.global_variables_initializer())
-
-#Load pretrained vgg weights
-model.LoadVGG(session, pretrained_path='data/weights/vgg_params.npz')
-
-
-# pretrained_vgg = 'data/weights/vgg_params.npz'
-# vgg_weights = np.load( pretrained_vgg)
-#
-# vgg_W = vgg_weights['processed_W'].item()
-# vgg_B = vgg_weights['processed_B'].item()
-#
-# for name in vgg_W:
-#     if name != 'fc8':
-#         print(name)
-#         weight = [w for w in tf.trainable_variables() if name in w.name and 'weight' in w.name][0]
-#         print(weight)
-#         session.run(weight.assign(vgg_W[name]))
-#
-# for name in vgg_B:
-#     if name != 'fc8':
-#         print(name)
-#         weight = [w for w in tf.trainable_variables() if name in w.name and 'biases' in w.name][0]
-#         print(weight)
-#         session.run(weight.assign(vgg_B[name]))
+saver.restore(session, os.path.join(expdir, 'model.bin'))
 
 
 avg_loss = MovingAvg(0.97)  # exponential moving average of the training loss
@@ -124,7 +93,7 @@ for idx in range(params.iters):
 
   c, _ = session.run([model.avg_loss, model.train_op], feed_dict)
   cc = avg_loss.Update(c)
-  if idx % 1 ==0:
+  if idx % 50 ==0:
       print('Iter: {}'.format(idx))
       # test one batch from the validation set
       val_c = session.run(model.avg_loss, valdata.GetFeedDict(model, channel_mean=channel_mean))
@@ -134,10 +103,3 @@ for idx in range(params.iters):
   if idx % 2000 == 0:  # save a model file every 500 minibatches
     saver.save(session, os.path.join(expdir, 'model.bin'),
                write_meta_graph=False)
-
-
-
-with session:
-    writer = tf.summary.FileWriter("output", session.graph)
-    print(session.run(model.per_word_loss))
-    writer.close()

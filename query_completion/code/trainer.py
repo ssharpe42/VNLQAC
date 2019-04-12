@@ -89,6 +89,7 @@ session = tf.Session(config=config)
 session.run(tf.global_variables_initializer())
 
 #Load pretrained vgg weights
+#https://www.cs.toronto.edu/~frossard/post/vgg16/
 pretrained_vgg = 'data/weights/vgg_params.npz'
 vgg_weights = np.load( pretrained_vgg)
 
