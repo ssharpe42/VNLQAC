@@ -29,14 +29,12 @@ imsize_file = os.path.join(text_objseg_location,'exp-referit/data/referit_imsize
 
 # Saving directory
 query_data_folder = 'referit'
-train_img_folder = 'referit/img_train'
-val_img_folder = 'referit/img_val'
+img_folder = 'referit/processed_images_224'
 
-# Model Params
-input_H = 512;
-featmap_H = (input_H // 32)
-input_W = 512;
-featmap_W = (input_W // 32)
+# Image Size
+input_H = 224
+input_W = 224
+
 
 ################################################################################
 # Load annotations
@@ -61,7 +59,7 @@ for n_imcrop in range(num_imcrop_train):
     imcrop_name = train_imcrop_list[n_imcrop]
 
     # Image
-    imname = imcrop_name.split('_', 1)[0] + '.jpg'
+    imname = imcrop_name.split('_', 1)[0]
     for q in train_query_dict[imcrop_name]:
         train_images.append(imname)
         train_queries.append(q)
@@ -74,7 +72,7 @@ for n_imcrop in range(num_imcrop_val):
     imcrop_name = val_imcrop_list[n_imcrop]
 
     # Image
-    imname = imcrop_name.split('_', 1)[0] + '.jpg'
+    imname = imcrop_name.split('_', 1)[0]
     for q in val_query_dict[imcrop_name]:
         val_images.append(imname)
         val_queries.append(q)
@@ -86,42 +84,33 @@ for n_imcrop in range(num_imcrop_val):
 if not os.path.isdir(query_data_folder):
     os.mkdir(query_data_folder)
 
-train_df = pd.DataFrame({'queries': train_queries, 'images': train_images})
+train_df = pd.DataFrame({'query': train_queries, 'image_id': train_images})
+train_df['dataset'] = 'referit'
 train_df.to_csv(os.path.join(query_data_folder, 'train_queries.txt'), sep='\t', encoding='utf-8', index=False)
 
-val_df = pd.DataFrame({'queries': val_queries, 'images': val_images})
+val_df = pd.DataFrame({'query': val_queries, 'image_id': val_images})
+val_df['dataset'] = 'referit'
 val_df.to_csv(os.path.join(query_data_folder, 'val_queries.txt'), sep='\t', encoding='utf-8', index=False)
 
 ################################################################################
 # Process images
 ################################################################################
-if not os.path.isdir(train_img_folder):
-    os.mkdir(train_img_folder)
-if not os.path.isdir(val_img_folder):
-    os.mkdir(val_img_folder)
+if not os.path.isdir(img_folder):
+    os.mkdir(img_folder)
 
 
-train_images = np.unique(train_df.images)
-for i in range(len(train_images)):
-    print('saving img {}: {}'.format(i,train_images[i]))
-    imname = train_images[i]
+images = np.concatenate([np.unique(train_df.image_id), np.unique(val_df.image_id)])
+
+for i in range(len(images)):
+
+    if i%100==0:
+        print('Image {}'.format(i))
+
+    imname = images[i] +'.jpg'
     im = skimage.io.imread(image_dir + imname)
 
     processed_im = skimage.img_as_ubyte(im_processing.resize_and_pad(im, input_H, input_W))
     if processed_im.ndim == 2:
         processed_im = processed_im[:, :, np.newaxis]
 
-    np.save(file=os.path.join(train_img_folder , imname[:-4] + '.npy'), arr=processed_im)
-
-
-val_images = np.unique(val_df.images)
-for i in range(len(val_images)):
-    print('saving img {}: {}'.format(i,val_images[i]))
-    imname = val_images[i]
-    im = skimage.io.imread(image_dir + imname)
-
-    processed_im = skimage.img_as_ubyte(im_processing.resize_and_pad(im, input_H, input_W))
-    if processed_im.ndim == 2:
-        processed_im = processed_im[:, :, np.newaxis]
-
-    np.save(file=os.path.join(val_img_folder , imname[:-4] + '.npy'), arr=processed_im)
+    np.save(file=os.path.join(img_folder , imname[:-4] + '.npy'), arr=processed_im)

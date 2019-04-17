@@ -71,7 +71,9 @@ sufficient_image_ids = np.unique(VB_image_query.image_id.values)
 
 train_images, val_images = train_test_split(sufficient_image_ids, test_size=.15, random_state=42)
 train_image_queries = VB_image_query[VB_image_query.image_id.isin(train_images)]
+train_image_queries['dataset'] = 'visual'
 val_image_queries = VB_image_query[VB_image_query.image_id.isin(val_images)]
+val_image_queries['dataset'] = 'visual'
 
 train_image_queries.to_csv(os.path.join(query_data_folder,'train_image_queries.txt'), sep='\t',index = False, encoding = 'utf-8')
 val_image_queries.to_csv(os.path.join(query_data_folder,'val_image_queries.txt'),sep='\t', index = False, encoding = 'utf-8')

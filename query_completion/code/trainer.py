@@ -10,14 +10,15 @@ import tensorflow as tf
 
 import sys
 #file_path = os.path.dirname(__file__)
-# file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/code_img'
-#
-# os.chdir('/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion')
-# sys.path.insert(0,'code')
-# pd.options.display.max_columns = 100
+file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/code_img'
+
+os.chdir('/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion')
+sys.path.insert(0,'code')
+pd.options.display.max_columns = 100
+
 
 import helper
-from dataset import  LoadReferItData,ReferItDataset
+from dataset import  LoadData, Dataset
 from model import Model
 from vgg_net import channel_mean
 from metrics import MovingAvg
@@ -41,13 +42,13 @@ from vocab import Vocab
 threads = 2
 only_char = False
 params = 'code/default_params.json'
-train_data = 'data/referit/train_queries.txt'
-val_data = 'data/referit/val_queries.txt'
-train_img_dir = 'data/referit/img_train/'
-val_img_dir = 'data/referit/img_val/'
+train_data = ['data/visual/train_image_queries.txt','data/referit/train_queries.txt']
+val_data = ['data/visual/val_image_queries.txt']
+img_dir = {'visual':'data/visual/processed_images_224/','referit':'data/referit/processed_images_224/'}
+
 
 #expdir = args.expdir
-expdir = 'referit_experiment_img'
+expdir = 'visual_experiment'
 if not os.path.exists(expdir):
   os.mkdir(expdir)
 else:
@@ -64,18 +65,20 @@ logging.basicConfig(filename=os.path.join(expdir, 'logfile.txt'),
                     level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler())
 
-df = LoadReferItData(train_data)
+df = LoadData(train_data)
 char_vocab = Vocab.MakeFromData(df.query_, min_count=10)
 char_vocab.Save(os.path.join(expdir, 'char_vocab.pickle'))
 params.vocab_size = len(char_vocab)
-dataset = ReferItDataset(df, char_vocab, max_len=params.max_len,
+dataset = Dataset(df, char_vocab, max_len=params.max_len,
                         batch_size=params.batch_size,
-                         image_dir = train_img_dir,
+                         image_dir = img_dir,
+                        image_size=params.img_size,
                          only_char=only_char)
 
-val_df = LoadReferItData(val_data)
-valdata = ReferItDataset(val_df, char_vocab,  max_len=params.max_len,
-                  batch_size=params.batch_size, image_dir = val_img_dir,
+val_df = LoadData(val_data)
+valdata = Dataset(val_df, char_vocab,  max_len=params.max_len,
+                  batch_size=params.batch_size, image_dir = img_dir,
+                        image_size = params.img_size,
                          only_char=only_char)
 
 model = Model(params,only_char=only_char)
@@ -89,26 +92,11 @@ session = tf.Session(config=config)
 session.run(tf.global_variables_initializer())
 
 #Load pretrained vgg weights
-#https://www.cs.toronto.edu/~frossard/post/vgg16/
-pretrained_vgg = 'data/weights/vgg_params.npz'
-vgg_weights = np.load( pretrained_vgg)
+model.LoadVGG(session, pretrained_path='data/weights/vgg_params.npz')
 
-vgg_W = vgg_weights['processed_W'].item()
-vgg_B = vgg_weights['processed_B'].item()
-
-for name in vgg_W:
-    if 'conv' in name:
-        print(name)
-        weight = [w for w in tf.all_variables() if name in w.name and 'weight' in w.name][0]
-        print(weight)
-        session.run(weight.assign(vgg_W[name]))
-
-# char_vars = [v for v in tf.global_variables() if v.name in ['char_embeddings:0','char_bias:0']]
-# saver2 = tf.train.Saver(char_vars)
-# saver2.restore(session,'/Users/Sam/Desktop/referit_experiment/model.bin')
 
 avg_loss = MovingAvg(0.97)  # exponential moving average of the training loss
-avg_val_loss = MovingAvg(0.5)  # exponential moving average of the val loss
+avg_val_loss = MovingAvg(0.9)  # exponential moving average of the val loss
 for idx in range(params.iters):
   feed_dict = dataset.GetFeedDict(model, channel_mean=channel_mean)
   feed_dict[model.dropout_keep_prob] = params.dropout
@@ -116,8 +104,7 @@ for idx in range(params.iters):
 
   c, _ = session.run([model.avg_loss, model.train_op], feed_dict)
   cc = avg_loss.Update(c)
-  if idx % 50 ==0:
-
+  if idx % 1 ==0:
       print('Iter: {}'.format(idx))
       # test one batch from the validation set
       val_c = session.run(model.avg_loss, valdata.GetFeedDict(model, channel_mean=channel_mean))
@@ -127,7 +114,6 @@ for idx in range(params.iters):
   if idx % 2000 == 0:  # save a model file every 500 minibatches
     saver.save(session, os.path.join(expdir, 'model.bin'),
                write_meta_graph=False)
-
 
 
 
