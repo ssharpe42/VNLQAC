@@ -13,5 +13,6 @@
     "rank": 64,
     "iters": 50000,
     "batch_size": 3,
-    "vgg_feat_type": "full"
+    "vgg_feat_type": "full",
+    "learning_rate": 0.0001
 }

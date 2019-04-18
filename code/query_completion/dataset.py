@@ -1,34 +1,51 @@
 """Holds the Dataset class used for managing training and test data."""
 import datetime
 import os
-
 import numpy as np
 import pandas
 
 
 
-def LoadData(filenames, samples = [], split=True):
+def LoadData(filename, split=True):
     """Load a bunch of files as a pandas dataframe.
 
     Input files should have two columns for userid, query
     """
-    if not samples:
-        samples = [1 for i in range(len(filenames))]
-
     def Prepare(s):
         s = str(s)
         return ['<S>'] + list(s) + ['</S>']
 
-    df = pandas.concat([pandas.read_csv(filenames[i], sep='\t').sample(frac = samples[i]) for i in range(len(filenames))])
+    df = pandas.read_csv(filename, sep='\t')
+
     if split:
         df['query_'] = df['query'].apply(Prepare)
 
     return df
 
 
+#
+# def LoadData(filenames, samples = [], split=True):
+#     """Load a bunch of files as a pandas dataframe.
+#
+#     Input files should have two columns for userid, query
+#     """
+#     if not samples:
+#         samples = [1 for i in range(len(filenames))]
+#
+#     def Prepare(s):
+#         s = str(s)
+#         return ['<S>'] + list(s) + ['</S>']
+#
+#     df = pandas.concat([pandas.read_csv(filenames[i], sep='\t').sample(frac = samples[i]) for i in range(len(filenames))])
+#     if split:
+#         df['query_'] = df['query'].apply(Prepare)
+#
+#     return df
+
+
 class Dataset(object):
 
-    def __init__(self, df, char_vocab, batch_size=24, max_len=50, image_dir = {}, image_size = 224, only_char = False):
+    def __init__(self, df, char_vocab, batch_size=24, max_len=50,image_dir='', image_size = 224, only_char = False):
         self.max_len = max_len
         self.char_vocab = char_vocab
         self.df = df.sample(frac=1)
@@ -71,7 +88,7 @@ class Dataset(object):
             for i in xrange(len(grp)):
 
                 row = grp.iloc[i]
-                img = np.load(os.path.join(self.image_dir[row['dataset']], row.images))
+                img = np.load(os.path.join(self.image_dir, row.images))
                 img_mat[i,] = img
                 for j in range(row.lengths):
                     f1[i, j] = self.char_vocab[row.query_[j]]

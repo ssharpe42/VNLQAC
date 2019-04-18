@@ -1,17 +1,16 @@
 import os
+import sys
 
 import numpy as np
+import tensorflow as tf
+from code.util.vgg import vgg_net
 
-#sys.path.append('../../text_objseg/')
-from util.vgg.cnn import *
-from util.vgg import vgg_net
-
-from util import helper
+from code.util import helper
 from factorcell import FactorCell
 from vocab import Vocab
 
 
-class MetaModel(object):
+class MetaQACModel(object):
     """Helper class for loading models."""
 
     def __init__(self, expdir):
@@ -20,14 +19,11 @@ class MetaModel(object):
                                        expdir)
         # mapping of characters to indices
         self.char_vocab = Vocab.Load(os.path.join(expdir, 'char_vocab.pickle'))
-        # mapping of user ids to indices
-        #self.user_vocab = Vocab.Load(os.path.join(expdir, 'user_vocab.pickle'))
         self.params.vocab_size = len(self.char_vocab)
-        #self.params.user_vocab_size = len(self.user_vocab)
         # construct the tensorflow graph
         self.graph = tf.Graph()
         with self.graph.as_default():
-            self.model = Model(self.params, training_mode=False)
+            self.model = QACModel(self.params, training_mode=False)
             self.char_tensor = tf.constant(self.char_vocab.GetWords(), name='char_tensor')
             self.beam_chars = tf.nn.embedding_lookup(self.char_tensor, self.model.selected)
 
@@ -61,19 +57,19 @@ class MetaModel(object):
         self.Restore()
 
 
-class Model(object):
+class QACModel(object):
     """Defines the Tensorflow graph for training and testing a model."""
 
-    def __init__(self, params, training_mode=True, optimizer=tf.train.AdamOptimizer,
-                 learning_rate=0.001,only_char = False):
+    def __init__(self, params, training_mode=True, optimizer=tf.train.AdamOptimizer,only_char = False):
         self.params = params
         self.only_char = only_char
-        opt = optimizer(learning_rate)
+        opt = optimizer(params.learning_rate)
         self.BuildGraph(params, training_mode=training_mode, optimizer=opt)
         if not training_mode:
             self.BuildDecoderGraph()
 
     def BuildGraph(self, params, training_mode=True, optimizer=None):
+
         self.queries = tf.placeholder(tf.int32, [None, params.max_len], name='queries')
         self.query_lengths = tf.placeholder(tf.int32, [None], name='query_lengths')
         self.dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='keep_prob')
@@ -82,100 +78,86 @@ class Model(object):
         x = self.queries[:, :-1]  # strip off the end of query token
         y = self.queries[:, 1:]  # need to predict y from x
 
-        with tf.variable_scope('char'):
-            self.char_embeddings = tf.get_variable(
-                'char_embeddings', [params.vocab_size, params.char_embed_size])
-            self.char_bias = tf.get_variable('char_bias', [params.vocab_size])
+        with tf.variable_scope('QAC'):
 
-        inputs = tf.nn.embedding_lookup(self.char_embeddings, x)
+            with tf.variable_scope('char'):
+                self.char_embeddings = tf.get_variable(
+                    'char_embeddings', [params.vocab_size, params.char_embed_size])
+                self.char_bias = tf.get_variable('char_bias', [params.vocab_size])
 
-        if self.only_char:
-            self.images = tf.placeholder(tf.float32, [None, params.image_feat_size])
-            self.vgg_placeholder = tf.get_variable("vgg_placeholder", [params.image_feat_size,params.image_feat_size], initializer=tf.zeros_initializer())
-            self.vgg_feat = tf.matmul(self.images, self.vgg_placeholder)
-            print(self.vgg_feat.get_shape().as_list())
-        else:
-            self.images = tf.placeholder(tf.float32, [None, params.img_size, params.img_size, 3])
-            if params.vgg_feat_type =='full':
-                self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
-                                                apply_dropout=params.apply_dropout,
-                                                output_dim=params.image_feat_size,
-                                                initialize = False)
-            elif params.vgg_feat_type =='fc':
-                self.vgg_feat = vgg_net.vgg_fc(self.images, 'vgg_local',
-                                               keep_prob = self.fc_dropout_keep_prob,
-                                               output_dim=params.image_feat_size,
-                                               initialize=False)
-            elif params.vgg_feat_type =='gap':
-                self.vgg_feat = vgg_net.vgg_gap_fc(self.images, 'vgg_local',
-                                                   keep_prob = self.fc_dropout_keep_prob,
-                                                   output_dim=params.image_feat_size,
-                                                   initialize=False)
-            elif params.vgg_feat_type =='fap':
-                self.vgg_feat = vgg_net.vgg_fap_fc(self.images, 'vgg_local',
-                                                   keep_prob = self.fc_dropout_keep_prob,
-                                                   output_dim=params.image_feat_size,
-                                                   initialize=False)
+            inputs = tf.nn.embedding_lookup(self.char_embeddings, x)
+
+            if self.only_char:
+                self.images = tf.placeholder(tf.float32, [None, params.image_feat_size])
+                self.vgg_placeholder = tf.get_variable("vgg_placeholder", [params.image_feat_size,params.image_feat_size], initializer=tf.zeros_initializer())
+                self.vgg_feat = tf.matmul(self.images, self.vgg_placeholder)
+                print(self.vgg_feat.get_shape().as_list())
+            else:
+
+                self.images = tf.placeholder(tf.float32, [None, params.img_size, params.img_size, 3])
+                if params.vgg_feat_type =='full':
+
+                    self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
+                                                    apply_dropout=params.apply_dropout,
+                                                    output_dim=params.image_feat_size,
+                                                    initialize = False)
 
 
-        # create a mask to zero out the loss for the padding tokens
-        indicator = tf.sequence_mask(self.query_lengths - 1, params.max_len - 1)
-        _mask = tf.where(indicator, tf.ones_like(x, dtype=tf.float32),
-                         tf.zeros_like(x, dtype=tf.float32))
 
-        with tf.variable_scope('rnn'):
-            self.decoder_cell = FactorCell(params.num_units, params.char_embed_size,
-                                           self.vgg_feat,
-                                           bias_adaptation=params.use_mikolov_adaptation,
-                                           lowrank_adaptation=params.use_lowrank_adaptation,
-                                           rank=params.rank,
-                                           layer_norm=params.use_layer_norm,
-                                           dropout_keep_prob=self.dropout_keep_prob)
+            # create a mask to zero out the loss for the padding tokens
+            indicator = tf.sequence_mask(self.query_lengths - 1, params.max_len - 1)
+            _mask = tf.where(indicator, tf.ones_like(x, dtype=tf.float32),
+                             tf.zeros_like(x, dtype=tf.float32))
 
-            outputs, _ = tf.nn.dynamic_rnn(self.decoder_cell, inputs,
-                                           sequence_length=self.query_lengths,
-                                           dtype=tf.float32)
-            # reshape outputs to 2d before passing to the output layer
-            reshaped_outputs = tf.reshape(outputs, [-1, params.num_units])
-            projected_outputs = tf.layers.dense(reshaped_outputs, params.char_embed_size,
-                                                name='proj')
-            reshaped_logits = tf.matmul(projected_outputs, self.char_embeddings,
-                                        transpose_b=True) + self.char_bias
+            with tf.variable_scope('rnn'):
+                self.decoder_cell = FactorCell(params.num_units, params.char_embed_size,
+                                               self.vgg_feat,
+                                               bias_adaptation=params.use_mikolov_adaptation,
+                                               lowrank_adaptation=params.use_lowrank_adaptation,
+                                               rank=params.rank,
+                                               layer_norm=params.use_layer_norm,
+                                               dropout_keep_prob=self.dropout_keep_prob)
 
-        reshaped_labels = tf.reshape(y, [-1])
-        reshaped_mask = tf.reshape(_mask, [-1])
+                outputs, _ = tf.nn.dynamic_rnn(self.decoder_cell, inputs,
+                                               sequence_length=self.query_lengths,
+                                               dtype=tf.float32)
+                # reshape outputs to 2d before passing to the output layer
+                reshaped_outputs = tf.reshape(outputs, [-1, params.num_units])
+                projected_outputs = tf.layers.dense(reshaped_outputs, params.char_embed_size,
+                                                    name='proj')
+                reshaped_logits = tf.matmul(projected_outputs, self.char_embeddings,
+                                            transpose_b=True) + self.char_bias
 
-        reshaped_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=reshaped_logits, labels=reshaped_labels)
-        masked_loss = tf.multiply(reshaped_loss, reshaped_mask)
+            reshaped_labels = tf.reshape(y, [-1])
+            reshaped_mask = tf.reshape(_mask, [-1])
 
-        # reshape the loss back to the input size in order to compute
-        # the per sentence loss
-        self.per_word_loss = tf.reshape(masked_loss, tf.shape(x))
-        self.per_sentence_loss = tf.div(tf.reduce_sum(self.per_word_loss, 1),
-                                        tf.reduce_sum(_mask, 1))
-        self.per_sentence_loss = tf.reduce_sum(self.per_word_loss, 1)
+            reshaped_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=reshaped_logits, labels=reshaped_labels)
+            masked_loss = tf.multiply(reshaped_loss, reshaped_mask)
 
-        total_loss = tf.reduce_sum(masked_loss)
-        self.words_in_batch = tf.to_float(tf.reduce_sum(self.query_lengths - 1))
-        self.avg_loss = total_loss / self.words_in_batch
+            # reshape the loss back to the input size in order to compute
+            # the per sentence loss
+            self.per_word_loss = tf.reshape(masked_loss, tf.shape(x))
+            self.per_sentence_loss = tf.div(tf.reduce_sum(self.per_word_loss, 1),
+                                            tf.reduce_sum(_mask, 1))
+            self.per_sentence_loss = tf.reduce_sum(self.per_word_loss, 1)
 
-        # if training_mode:
-        #   self.train_op = optimizer.minimize(self.avg_loss)
-        #
+            total_loss = tf.reduce_sum(masked_loss)
+            self.words_in_batch = tf.to_float(tf.reduce_sum(self.query_lengths - 1))
+            self.avg_loss = total_loss / self.words_in_batch
+
 
         # don't train conv layers
         if training_mode:
             tvars = tf.trainable_variables()
             if self.only_char:
                 non_vgg_conv_vars = [var for var in tvars if 'vgg' not in var.name]
-            elif params.vgg_feat_type != 'full':
-                non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
             else:
-                # non_vgg_conv_vars = [var for var in tvars if 'conv' not in var.name]
-                non_vgg_conv_vars = filter(lambda x: not x.startswith(('vgg_local/conv','vgg_local/fc6','vgg_local/fc7')),
+                # Only retrain last two layers
+                non_vgg_conv_vars = filter(lambda x: not x.startswith(('QAC/vgg_local/conv','QAC/vgg_local/fc6')),
                                            [var.name for var in tvars])
                 non_vgg_conv_vars = [var for var in tvars if var.name in non_vgg_conv_vars]
+
             self.train_op = optimizer.minimize(self.avg_loss, var_list=non_vgg_conv_vars)
 
 
@@ -186,10 +168,7 @@ class Model(object):
         vgg_W = vgg_weights['processed_W'].item()
         vgg_B = vgg_weights['processed_B'].item()
 
-        if self.params.vgg_feat_type!='full':
-            do_not_load =['fc6','fc7','fc8']
-        else:
-            do_not_load = ['fc8']
+        do_not_load = ['fc7','fc8']
 
         for name in vgg_W:
             if name not in do_not_load:

@@ -7,8 +7,8 @@ import logging
 import os
 import json
 import sys
-import pandas as pd
-import numpy as np
+sys.path.insert(0,'../')
+
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
@@ -38,9 +38,9 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 from dataset import LoadData, Dataset
-from model import Model, MetaModel
-import helper
-from metrics import MovingAvg
+from model import SelectionModel
+from code.util import helper
+from code.util.metrics import MovingAvg
 from bert_utils import create_tokenizer_from_hub_module
 
 
@@ -74,7 +74,7 @@ val_dataset = Dataset(query_dict = query_dict,
                   batch_size=32,
                   max_seq_len = params.max_seq_len )
 
-model = Model(params)
+model = SelectionModel(params)
 saver = tf.train.Saver(tf.global_variables())
 config = tf.ConfigProto(inter_op_parallelism_threads=2,
                         intra_op_parallelism_threads=2,

@@ -5,18 +5,18 @@ import time
 import tensorflow as tf
 
 import sys
+sys.path.insert(0,'../')
 #file_path = os.path.dirname(__file__)
 file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion/code_img'
-
 os.chdir('/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/query_completion')
-sys.path.insert(0,'code')
+
 pd.options.display.max_columns = 100
 
-from util import helper
+from code.util import helper
 from dataset import  LoadData, Dataset
-from model import Model
-from util.vgg.vgg_net import channel_mean
-from metrics import MovingAvg
+from model import QACModel
+from code.util.vgg import channel_mean
+from code.util.metrics import MovingAvg
 from vocab import Vocab
 
 
@@ -68,7 +68,7 @@ valdata = Dataset(val_df, char_vocab,  max_len=params.max_len,
                         image_size = params.img_size,
                          only_char=only_char)
 
-model = Model(params,only_char=only_char)
+model = QACModel(params,only_char=only_char)
 saver = tf.train.Saver(tf.global_variables())
 config = tf.ConfigProto(inter_op_parallelism_threads=threads,
                         intra_op_parallelism_threads=threads,

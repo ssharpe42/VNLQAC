@@ -1,10 +1,10 @@
 import argparse
 import numpy as np
+import sys
+sys.path.insert(0,'../')
 
 from dataset import Dataset, LoadData
-from model import MetaModel
-from metrics import MovingAvg
-
+from model import MetaQACModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument('expdir', help='experiment directory')
@@ -16,7 +16,7 @@ args = parser.parse_args()
 expdir = args.expdir
 
 
-metamodel = MetaModel(expdir)
+metamodel = MetaQACModel(expdir)
 model = metamodel.model
 metamodel.MakeSessionAndRestore(args.threads)
 

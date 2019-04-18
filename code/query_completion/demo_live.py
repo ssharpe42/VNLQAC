@@ -1,6 +1,6 @@
 from dynamic import DynamicModel
 from beam import GetCompletions, InitBeam,GetSavedKeystrokes
-from model import MetaModel
+from model import MetaQACModel
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ import os
 #from AMSGrad import AMSGrad
 
 print('Loading Model.....')
-m = MetaModel('../referit_experiment_img_4_3')
+m = MetaQACModel('../referit_experiment_img_4_3')
 m.MakeSessionAndRestore(2)
 
 print('Loading Image.....')

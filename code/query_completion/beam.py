@@ -1,10 +1,7 @@
 """Helper functions for beam search."""
 import numpy as np
-#from queue import PriorityQueue
 from Queue import PriorityQueue
 
-
-import numpy as np
 
 #
 # def InitBeam(phrase, m):

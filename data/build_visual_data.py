@@ -7,7 +7,6 @@ os.chdir(file_dir)
 sys.path.insert(0, 'data')
 
 
-
 import numpy as np
 import pandas as pd
 import glob
@@ -22,7 +21,6 @@ from sklearn.model_selection import train_test_split
 
 import im_processing
 from segment_everything_classes import segment_classes
-
 
 ################################################################################
 # Parameters
@@ -70,6 +68,7 @@ for item in ijson.items(f, 'item'):
 # VB_df2 = pickle.load(open('data/visual/VB_df_noimage.pkl','r'))
 # VB_df1['image_exists'] = True
 # VB_df2['image_exists'] = False
+# VB_df = pd.concat([VB_df1, VB_df2])
 
 VB_df = pd.DataFrame.from_dict(VB_data)
 
@@ -113,6 +112,7 @@ val_query_classes = VB_query_classes[VB_query_classes.image_id.isin(val_images)]
 test_query_classes = VB_query_classes[VB_query_classes.image_id.isin(test_images)]
 
 #Write Query --> Class to csv
+VB_query_classes.to_csv(os.path.join(query_data_folder,'query_classes.txt'), sep='\t',index = False, encoding = 'utf-8')
 train_query_classes.to_csv(os.path.join(query_data_folder,'train_query_classes.txt'), sep='\t',index = False, encoding = 'utf-8')
 val_query_classes.to_csv(os.path.join(query_data_folder,'val_query_classes.txt'),sep='\t', index = False, encoding = 'utf-8')
 test_query_classes.to_csv(os.path.join(query_data_folder,'test_query_classes.txt'),sep='\t', index = False, encoding = 'utf-8')

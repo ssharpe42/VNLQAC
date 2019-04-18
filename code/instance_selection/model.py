@@ -1,13 +1,16 @@
 import os
 import json
-import helper
+import sys
+#sys.path.insert(0,'../')
+
+from code.util import helper
 from bert_utils import *
 from bert import optimization
-from util.metrics import *
+from code.util.metrics import *
 
 
 
-class Model(object):
+class SelectionModel(object):
     """Defines the Tensorflow graph for training and testing a model."""
 
     def __init__(self, params, training_mode=True, optimizer=tf.train.AdamOptimizer, learning_rate=0.001):
@@ -18,54 +21,59 @@ class Model(object):
             self.BuildDecoderGraph()
 
     def BuildGraph(self, params, training_mode=True, optimizer=None):
-        self.input_ids = tf.placeholder(tf.int32, [None, params.max_seq_len], name='input_ids')
-        self.input_mask = tf.placeholder(tf.int32, [None,params.max_seq_len], name='input_mask')
-        self.segment_ids = tf.placeholder(tf.int32, [None,params.max_seq_len ], name='segment_ids')
-        self.labels = tf.placeholder(tf.float32, [None,params.num_labels ], name='labels')
-        self.bert_module = hub.Module("https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
-                                      trainable=True)
 
-        # self.pooled_output = bert_module(
-        #     dict(input_ids=np.array(f.input_ids).reshape(1, -1), input_mask=np.array(f.input_mask).reshape(1, -1),
-        #          segment_ids=np.array(f.segment_ids).reshape(1, -1)), signature='tokens', as_dict=True)
+        with tf.variable_scope('Selection'):
 
-        bert_output = self.bert_module(
-            dict(input_ids=self.input_ids, input_mask=self.input_mask,segment_ids=self.segment_ids),
-            signature='tokens', as_dict=True)
+            self.prob_threshold = tf.placeholder_with_default(0.5, (), name='prob_threshold')
+            self.input_ids = tf.placeholder(tf.int32, [None, params.max_seq_len], name='input_ids')
+            self.input_mask = tf.placeholder(tf.int32, [None,params.max_seq_len], name='input_mask')
+            self.segment_ids = tf.placeholder(tf.int32, [None,params.max_seq_len ], name='segment_ids')
+            self.labels = tf.placeholder(tf.float32, [None,params.num_labels ], name='labels')
+            self.bert_module = hub.Module("https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
+                                          trainable=True)
 
-        output_layer = bert_output["pooled_output"]
-        hidden_size = output_layer.shape[-1].value
+            # self.pooled_output = bert_module(
+            #     dict(input_ids=np.array(f.input_ids).reshape(1, -1), input_mask=np.array(f.input_mask).reshape(1, -1),
+            #          segment_ids=np.array(f.segment_ids).reshape(1, -1)), signature='tokens', as_dict=True)
 
-        # Create our own layer to tune for politeness data.
-        output_weights = tf.get_variable(
-            "output_weights", [params.num_labels, hidden_size],
-            initializer=tf.truncated_normal_initializer(stddev=0.02))
+            bert_output = self.bert_module(
+                dict(input_ids=self.input_ids, input_mask=self.input_mask,segment_ids=self.segment_ids),
+                signature='tokens', as_dict=True)
 
-        output_bias = tf.get_variable(
-            "output_bias", [params.num_labels], initializer=tf.zeros_initializer())
+            output_layer = bert_output["pooled_output"]
+            hidden_size = output_layer.shape[-1].value
 
-        with tf.variable_scope('loss'):
+            # Create our own layer to tune for politeness data.
+            output_weights = tf.get_variable(
+                "output_weights", [params.num_labels, hidden_size],
+                initializer=tf.truncated_normal_initializer(stddev=0.02))
 
-            output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
+            output_bias = tf.get_variable(
+                "output_bias", [params.num_labels], initializer=tf.zeros_initializer())
 
-            logits = tf.matmul(output_layer, output_weights, transpose_b=True)
-            logits = tf.nn.bias_add(logits, output_bias)
+            with tf.variable_scope('loss'):
 
-            sigmoid_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels = self.labels, logits = logits )
+                output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
 
-            self.probs = tf.nn.sigmoid(logits)
-            self.predicted_labels = tf.round(self.probs)
-            # If we're predicting, we want predicted labels and the probabiltiies.
-            # if is_predicting:
-            #   return (predicted_labels, log_probs)
+                logits = tf.matmul(output_layer, output_weights, transpose_b=True)
+                logits = tf.nn.bias_add(logits, output_bias)
 
-            # If we're train/eval, compute loss between predicted and actual label
-            total_loss = tf.reduce_sum(sigmoid_loss)
-            self.avg_loss = tf.to_float(total_loss)/tf.to_float(params.batch_size)
+                sigmoid_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels = self.labels, logits = logits )
 
-            self.tp = true_positives(self.labels ,self.predicted_labels)
-            self.fp = false_positives(self.labels, self.predicted_labels)
-            self.fn = false_negatives(self.labels, self.predicted_labels)
+                # If we're predicting, we want predicted labels and the probabiltiies.
+                # if is_predicting:
+                #   return (predicted_labels, log_probs)
+
+                # If we're train/eval, compute loss between predicted and actual label
+                total_loss = tf.reduce_sum(sigmoid_loss)
+                self.avg_loss = tf.to_float(total_loss)/tf.to_float(params.batch_size)
+
+
+                self.probs = tf.nn.sigmoid(logits)
+                self.predicted_labels = prediction_threshold(self.probs, self.prob_threshold)
+                self.tp = true_positives(self.labels ,self.predicted_labels)
+                self.fp = false_positives(self.labels, self.predicted_labels)
+                self.fn = false_negatives(self.labels, self.predicted_labels)
         # don't train conv layers
         if training_mode:
 
@@ -77,7 +85,7 @@ class Model(object):
                                                               use_tpu =False)
             else:
                 train_vars = [var for var in tf.trainable_variables() if
-                                var.name in ['output_weights:0', 'output_bias:0']]
+                                var.name in ['Selection/output_weights:0', 'Selection/output_bias:0']]
                 self.train_op = optimizer.minimize(self.avg_loss, var_list=train_vars)
 
 
@@ -88,7 +96,7 @@ class Model(object):
 
 
 
-class MetaModel(object):
+class MetaSelectionModel(object):
     """Helper class for loading models."""
 
     def __init__(self, expdir, tokenizer = None):
@@ -101,7 +109,7 @@ class MetaModel(object):
         # construct the tensorflow graph
         self.graph = tf.Graph()
         with self.graph.as_default():
-            self.model = Model(self.params, training_mode=False)
+            self.model = SelectionModel(self.params, training_mode=False)
 
     def MakeSession(self, threads=8):
         """Create the session with the given number of threads."""

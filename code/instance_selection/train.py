@@ -6,22 +6,20 @@ from __future__ import print_function
 import logging
 import os
 import json
-import sys
 import pandas as pd
-import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
-#
-file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/instance_selection/'
-os.chdir(file_path)
-sys.path.insert(0,'code')
+#file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/instance_selection/'
+#os.chdir(file_path)
 #pd.options.display.max_columns = 100
 
-
-data = '../query_completion/data/visual/query_classes.txt'
-params = 'code/default_params.json'
-expdir = 'experiment_4_16'
+data = 'data/visual/query_classes.txt'
+train_data = 'data/visual/train_query_classes.txt'
+val_data = 'data/visual/val_query_classes.txt'
+test_data = 'data/visual/test_query_classes.txt'
+params = 'code/instance_selection/default_params.json'
+expdir = 'selection_experiment'
 
 
 if not os.path.exists(expdir):
@@ -38,10 +36,9 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 from dataset import LoadData, Dataset
-from model import InstanceModel, InstanceMetaModel
-import helper
-from bert import optimization
-from metrics import *
+from model import SelectionModel
+from code.util import helper
+from code.util.metrics import *
 from bert_utils import create_tokenizer_from_hub_module
 
 
@@ -50,8 +47,10 @@ params = helper.GetParams(params, 'train', expdir)
 
 # Load data
 query_dict, class_indx, LABELS = LoadData(data, limit = None)
-train, val = train_test_split(query_dict.keys(), test_size=.2, random_state=42)
-val, test = train_test_split(val, test_size=.5, random_state=42)
+
+train = np.unique(pd.read_csv(train_data,sep = '\t',index_col=None)['query'])
+val = np.unique(pd.read_csv(val_data,sep = '\t',index_col=None)['query'])
+test = np.unique(pd.read_csv(test_data,sep = '\t',index_col=None)['query'])
 
 tokenizer = create_tokenizer_from_hub_module()
 params.num_labels = len(query_dict[train[0]])
@@ -83,7 +82,7 @@ test_dataset = Dataset(query_dict = query_dict,
                   batch_size=32,
                   max_seq_len = params.max_seq_len )
 
-model = InstanceModel(params)
+model = SelectionModel(params)
 saver = tf.train.Saver(tf.global_variables())
 config = tf.ConfigProto(inter_op_parallelism_threads=2,
                         intra_op_parallelism_threads=2,
@@ -123,17 +122,21 @@ for idx in range(params.iters):
         saver.save(session, os.path.join(expdir, 'model.bin'),
                    write_meta_graph=False)
 
+
 #Evaluate Test Set
 logging.info('Evaluating Test Set...')
-test_loss = 0
-test_tp, test_fp, test_fn = [0]*3
-test_iters = len(test_dataset.query_set)//params.batch_size +1
-for idx in range(test_iters):
 
-    test_c, tp, fp, fn = session.run([model.avg_loss, model.tp, model.fp, model.fn], val_dataset.GetFeedDict(model))
+thresholds = np.linspace(.1,.6, num = 11)
 
-    test_loss += test_c/test_iters; test_tp +=tp; test_fp+=fp; test_fn+=fn
+for thresh in thresholds:
+    test_loss = 0
+    test_tp, test_fp, test_fn = [0]*3
+    test_iters = len(test_dataset.query_set)//params.batch_size +1
+    for idx in range(test_iters):
 
+        test_c, tp, fp, fn = session.run([model.avg_loss, model.tp, model.fp, model.fn], val_dataset.GetFeedDict(model, prob_threshold=thresh))
 
-print({'test_loss':test_loss, 'test_f1': f1(tp, fp, fn)})
-logging.info({'test_loss':test_loss, 'test_f1': f1(tp, fp, fn)})
+        test_loss += test_c/test_iters; test_tp +=tp; test_fp+=fp; test_fn+=fn
+
+    print({'test_loss':test_loss, 'test_f1': f1(test_tp, test_fp, test_fn),'threshold': thresh})
+    logging.info({'test_loss':test_loss, 'test_f1': f1(tp, fp, fn),'threshold': thresh})

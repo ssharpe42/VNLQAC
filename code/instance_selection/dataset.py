@@ -1,5 +1,6 @@
 from bert_utils import *
-
+import pandas as pd
+import numpy as np
 
 def LoadData(filename, limit=None):
     """
@@ -60,7 +61,7 @@ class Dataset(object):
                                                    label=self.query_dict[q]))
 
 
-    def GetFeedDict(self, model):
+    def GetFeedDict(self, model, prob_threshold = 0.5):
 
         if self.current_idx + self.batch_size > len(self.query_set):
             self.current_idx = 0
@@ -90,7 +91,8 @@ class Dataset(object):
             model.input_ids: bert_dict['input_ids'],
             model.input_mask: bert_dict['input_mask'],
             model.segment_ids: bert_dict['segment_ids'],
-            model.labels: bert_dict['labels']
+            model.labels: bert_dict['labels'],
+            model.prob_threshold:prob_threshold
         }
 
         return feed_dict

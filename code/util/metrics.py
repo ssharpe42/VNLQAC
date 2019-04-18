@@ -1,5 +1,4 @@
 import sys
-
 import numpy as np
 import tensorflow as tf
 
@@ -50,7 +49,8 @@ def GetRankInList(query, qlist):
   return 1.0 / (1.0 + qlist.index(query))
 
 
-
+def prediction_threshold(prob, threshold = .5):
+  return tf.cast(tf.math.greater(prob,threshold), tf.float32)
 
 def true_positives(labels,predictions):
     return tf.reduce_sum(predictions * labels)
