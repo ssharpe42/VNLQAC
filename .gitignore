@@ -10,7 +10,10 @@
 .idea/
 
 venv/
-data/referit/
+data/referit/processed*
+data/referit/images/
+data/referit/*.txt
+data/referit/*.gz
 data/visual/images/
 data/visual/processed*
 data/visual/*.json

@@ -2,9 +2,9 @@ from __future__ import absolute_import, division, print_function
 
 import sys
 import os
-file_dir = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/'
-os.chdir(file_dir)
-sys.path.insert(0, 'data')
+#file_dir = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/'
+#os.chdir(file_dir)
+sys.path.insert(0, 'data')#
 
 
 import numpy as np
@@ -64,6 +64,7 @@ for item in ijson.items(f, 'item'):
                 VB_data['w'].append(obj['w'])
 
 
+# import pickle
 # VB_df1 = pickle.load(open('data/visual/VB_df.pkl','r'))
 # VB_df2 = pickle.load(open('data/visual/VB_df_noimage.pkl','r'))
 # VB_df1['image_exists'] = True
@@ -107,9 +108,16 @@ VB_query_classes = VB_df[~VB_df.duplicated(['query','class'])][['image_id','quer
 VB_class_instances = VB_df[~VB_df.duplicated(['image_id','class','x','y','w','h']) & (VB_df['image_exists'])]
 
 
-train_query_classes = VB_query_classes[VB_query_classes.image_id.isin(train_images)]
-val_query_classes = VB_query_classes[VB_query_classes.image_id.isin(val_images)]
-test_query_classes = VB_query_classes[VB_query_classes.image_id.isin(test_images)]
+unique_queries = np.unique(VB_query_classes['query'])
+train_query_classes, val_query_classes = train_test_split(unique_queries, test_size = 0.15, random_state=42)
+val_query_classes, test_query_classes = train_test_split(val_query_classes, test_size = 0.5, random_state=42)
+
+train_query_classes = pd.DataFrame({'query':train_query_classes})
+val_query_classes = pd.DataFrame({'query':val_query_classes})
+test_query_classes = pd.DataFrame({'query':test_query_classes})
+# train_query_classes = VB_query_classes[VB_query_classes['query'].isin(train_query_classes)]
+# val_query_classes = VB_query_classes[VB_query_classes['query'].isin(val_query_classes)]
+# test_query_classes = VB_query_classes[VB_query_classes['query'].isin(test_query_classes)]
 
 #Write Query --> Class to csv
 VB_query_classes.to_csv(os.path.join(query_data_folder,'query_classes.txt'), sep='\t',index = False, encoding = 'utf-8')
