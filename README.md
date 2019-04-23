@@ -49,8 +49,7 @@ Train: `python code/instance_selection/train.py /path/to/new/experimentdir
 --testdata /path/to/testing.txt`
 
 #### Demo
-
-
+Code to produce images with selected instances adapted from Learning to Segment Everything and located here: https://github.com/jinnick/DL_project_NLQAC_Instance_Selection
 
 
 Aspects of code adapted from:
