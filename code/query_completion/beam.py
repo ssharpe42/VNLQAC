@@ -3,30 +3,15 @@ import numpy as np
 from Queue import PriorityQueue
 
 
-#
-# def InitBeam(phrase, m):
-#   # Need to find the hidden state for the last char in the prefix.
-#   prev_hidden = np.zeros((1, 2 * m.params.num_units))
-#   for word in phrase[:-1]:
-#     feed_dict = {
-#        m.model.prev_hidden_state: prev_hidden,
-#        m.model.prev_word: [m.char_vocab[word]],
-#        m.model.beam_size: 4
-#     }
-#     prev_hidden = m.session.run(m.model.next_hidden_state, feed_dict)
-#
-#   return prev_hidden
 
-
-def InitBeam(phrase, m, vgg_feat):
+def InitBeam(phrase, m):
   # Need to find the hidden state for the last char in the prefix.
   prev_hidden = np.zeros((1, 2 * m.params.num_units))
   for word in phrase[:-1]:
     feed_dict = {
        m.model.prev_hidden_state: prev_hidden,
        m.model.prev_word: [m.char_vocab[word]],
-       m.model.beam_size: 4,
-       m.model.vgg_feat: vgg_feat
+       m.model.beam_size: 4
     }
     prev_hidden = m.session.run(m.model.next_hidden_state, feed_dict)
 
@@ -91,12 +76,12 @@ class BeamQueue(object):
     return self.__next__()
 
 
-def GetCompletions(prefix, image_feat, m, branching_factor=8, beam_size=300,
+def GetCompletions(prefix, m, branching_factor=4, beam_size=300,
                    stop='</S>'):
   """ Find top completions for a given prefix, user and model."""
-  #m.Lock(image)  # pre-compute the adaptive recurrent matrix
+  # m.Lock(image)  # pre-compute the adaptive recurrent matrix
 
-  prev_state = InitBeam(prefix, m, image_feat)
+  prev_state = InitBeam(prefix, m)
   nodes = [BeamItem(prefix, prev_state)]
 
   for i in range(36):
@@ -109,7 +94,7 @@ def GetCompletions(prefix, image_feat, m, branching_factor=8, beam_size=300,
         current_nodes.append(node)  # these ones will get extended
     if len(current_nodes) == 0:
       return new_nodes  # all beams have finished
-    
+
     # group together all the nodes in the queue for efficient computation
     prev_hidden = np.vstack([item.prev_hidden for item in current_nodes])
     prev_words = np.array([m.char_vocab[item.words[-1]] for item in current_nodes])

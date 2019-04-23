@@ -1,45 +1,47 @@
 import logging
 import os
+import argparse
 import time
 import sys
 import tensorflow as tf
 
+sys.path.insert(1, os.path.join(sys.path[0],'..'))
 
-# file_path = '/Users/Sam/Desktop/School/Deep Learning/FinalProject/NLQAC_ObjSeg/code/query_completion'
-# os.chdir(file_path)
-#sys.path.insert(0,'../')
+from util import helper
+from util.metrics import MovingAvg
+from util.vgg.vgg_net import channel_mean
+from query_completion.dataset import LoadData, Dataset
+from query_completion.model import QACModel
+from query_completion.vocab import Vocab
 
-from code.util import helper
-from code.util.metrics import MovingAvg
-from code.util.vgg.vgg_net import channel_mean
-from code.query_completion.dataset import LoadData, Dataset
-from code.query_completion.model import QACModel
-from code.query_completion.vocab import Vocab
 
-# Take out args for now
+parser = argparse.ArgumentParser()
+parser.add_argument('expdir', help='experiment directory')
+parser.add_argument('--params', type=str, default='code/query_completion/default_params.json',
+                    help='json file with hyperparameters')
+parser.add_argument('--data', type=str,  dest='data',
+                    help='where to load the data', nargs='+')
+parser.add_argument('--valdata', type=str,  dest='valdata',
+                    help='where to load the validation data', nargs='+')
+parser.add_argument('--samples', type=int, default=[],
+                    help='how much to sample each dataset', nargs='+')
+parser.add_argument('--visualimg', type=str,  dest='visualimg',
+                    help='visual preprocessed img dir', nargs='+', default = 'data/visual/processed_images_224/')
+parser.add_argument('--referitimg', type=str,  dest='referitimg',
+                    help='referit preprocessed img dir', nargs='+', default = 'data/referit/processed_images_224/')
+parser.add_argument('--threads', type=int, default=2,
+                    help='how many threads to use in tensorflow')
+args = parser.parse_args()
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('expdir', help='experiment directory')
-# parser.add_argument('--params', type=str, default='default_params.json',
-#                     help='json file with hyperparameters')
-# parser.add_argument('--data', type=str, action='append', dest='data',
-#                     help='where to load the data from')
-# parser.add_argument('--valdata', type=str, action='append', dest='valdata',
-#                     help='where to load validation data', default=[])
-# parser.add_argument('--threads', type=int, default=12,
-#                     help='how many threads to use in tensorflow')
-# args = parser.parse_args()
-
-threads = 2
+# Do not set to TRUE
 only_char = False
-params = 'code/query_completion/default_params.json'
-train_data = 'data/visual/train_image_queries.txt'
-val_data = 'data/visual/val_image_queries.txt'
-test_data = 'data/visual/test_image_queries.txt'
-img_dir = 'data/visual/processed_images_224/'
 
-# expdir = args.expdir
-expdir = 'query_experiment'
+train_data = args.data
+val_data = args.valdata
+samples = args.samples
+img_dir = {'visual':'data/visual/processed_images_224/', 'referit':'data/referit/processed_images_224/'}
+expdir = args.expdir
+
 if not os.path.exists(expdir):
     os.mkdir(expdir)
 else:
@@ -55,7 +57,7 @@ logging.basicConfig(filename=os.path.join(expdir, 'logfile.txt'),
                     level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler())
 
-df = LoadData(train_data)
+df = LoadData(train_data, samples = samples)
 char_vocab = Vocab.MakeFromData(df.query_ , min_count=10)
 char_vocab.Save(os.path.join(expdir, 'char_vocab.pickle'))
 params.vocab_size = len(char_vocab)
@@ -66,17 +68,8 @@ dataset = Dataset(df, char_vocab,
                   image_size=params.img_size,
                   only_char=only_char)
 
-val_df = LoadData(val_data)
+val_df = LoadData(val_data, samples = samples)
 valdata = Dataset(val_df, char_vocab,
-                  max_len=params.max_len,
-                  batch_size=params.batch_size,
-                  image_dir=img_dir,
-                  image_size=params.img_size,
-                  only_char=only_char)
-
-
-test_df = LoadData(test_data)
-testdata = Dataset(test_df, char_vocab,
                   max_len=params.max_len,
                   batch_size=params.batch_size,
                   image_dir=img_dir,
@@ -86,8 +79,8 @@ testdata = Dataset(test_df, char_vocab,
 
 model = QACModel(params, only_char=only_char)
 saver = tf.train.Saver(tf.global_variables())
-config = tf.ConfigProto(inter_op_parallelism_threads=threads,
-                        intra_op_parallelism_threads=threads,
+config = tf.ConfigProto(inter_op_parallelism_threads=args.threads,
+                        intra_op_parallelism_threads=args.threads,
                         allow_soft_placement=True)
 
 # log_device_placement=True)
@@ -115,6 +108,6 @@ for idx in range(params.iters):
         vc = avg_val_loss.Update(val_c)
     if idx % 200 == 0 and idx > 0:
         logging.info({'iter': idx, 'cost': cc, 'rawcost': c, 'rawvalcost': val_c, 'valcost': vc})
-    if idx % 2000 == 0:  # save a model file every 500 minibatches
+    if idx % 2000 == 0:  # save a model file
         saver.save(session, os.path.join(expdir, 'model.bin'),write_meta_graph=False)
 

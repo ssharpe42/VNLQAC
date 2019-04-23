@@ -8,8 +8,6 @@ from tensorflow.python.ops.nn import dropout as drop
 from .cnn import conv_layer as conv
 from .cnn import conv_relu_layer as conv_relu
 from .cnn import pooling_layer as pool
-from .cnn import global_avg_pooling_layer as gap_pool
-from .cnn import feature_avg_pooling_layer as fap_pool
 from .cnn import fc_layer as fc
 from .cnn import fc_relu_layer as fc_relu
 from .cnn import fc_relu_droput_layer as fc_relu_do

@@ -2,11 +2,11 @@ import os
 import json
 import sys
 #sys.path.insert(0,'../')
-
-from code.util import helper
+sys.path.insert(1, os.path.join(sys.path[0],'..'))
+from util import helper
 from bert_utils import *
 from bert import optimization
-from code.util.metrics import *
+from util.metrics import *
 
 
 
@@ -23,8 +23,9 @@ class SelectionModel(object):
     def BuildGraph(self, params, training_mode=True, optimizer=None):
 
         with tf.variable_scope('Selection'):
-
+        #with tf.variable_scope('None'):
             self.prob_threshold = tf.placeholder_with_default(0.5, (), name='prob_threshold')
+            self.dropout = tf.placeholder_with_default(0.9, (), name = 'dropout')
             self.input_ids = tf.placeholder(tf.int32, [None, params.max_seq_len], name='input_ids')
             self.input_mask = tf.placeholder(tf.int32, [None,params.max_seq_len], name='input_mask')
             self.segment_ids = tf.placeholder(tf.int32, [None,params.max_seq_len ], name='segment_ids')
@@ -53,7 +54,7 @@ class SelectionModel(object):
 
             with tf.variable_scope('loss'):
 
-                output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
+                output_layer = tf.nn.dropout(output_layer, keep_prob=self.dropout)
 
                 logits = tf.matmul(output_layer, output_weights, transpose_b=True)
                 logits = tf.nn.bias_add(logits, output_bias)
@@ -130,7 +131,7 @@ class MetaSelectionModel(object):
         self.Restore()
 
 
-    def predict(self, query, top_k = None):
+    def predict(self, query, threshold = 0.3, top_k = None):
 
         input_features = convert_single_example(InputExample(guid=None,text_a=query,text_b=None, label=None),
                                self.params.max_seq_len, self.tokenizer)
@@ -138,15 +139,24 @@ class MetaSelectionModel(object):
         feed_dict = {
             self.model.input_ids: np.array(input_features.input_ids).reshape(1,-1),
             self.model.input_mask: np.array(input_features.input_mask).reshape(1,-1),
-            self.model.segment_ids: np.array(input_features.segment_ids).reshape(1,-1)
+            self.model.segment_ids: np.array(input_features.segment_ids).reshape(1,-1),
+            self.model.dropout: 1.0
         }
 
         if not top_k:
-            return self.session.run(self.model.probs, feed_dict)
+            feed_dict[self.model.n_items] = self.params.num_labels
+            selected_probs, selected = self.session.run([self.model.selected_probs, self.model.selected], feed_dict)
+            selected_classes = np.array([self.indx_to_class[i] for i in selected[0]])
+
+            over_threshold = np.where(selected_probs[0]>threshold)[0]
+
+            if over_threshold.size == 0:
+                over_threshold = 0
+
+            return selected_classes[over_threshold], selected_probs[0][over_threshold]
         else:
             feed_dict[self.model.n_items] = top_k
             selected_probs, selected = self.session.run([self.model.selected_probs, self.model.selected ], feed_dict)
-            print(selected)
             selected_classes = np.array([self.indx_to_class[i] for i in selected[0]])
 
-            return selected_probs[0], selected[0], selected_classes
+            return selected_classes, selected_probs[0]

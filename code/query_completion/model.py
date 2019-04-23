@@ -1,11 +1,12 @@
 import os
 import sys
-
 import numpy as np
 import tensorflow as tf
-from code.util.vgg import vgg_net
 
-from code.util import helper
+sys.path.insert(1, os.path.join(sys.path[0],'..'))
+
+from util.vgg import vgg_net
+from util import helper
 from factorcell import FactorCell
 from vocab import Vocab
 
@@ -27,16 +28,12 @@ class MetaQACModel(object):
             self.char_tensor = tf.constant(self.char_vocab.GetWords(), name='char_tensor')
             self.beam_chars = tf.nn.embedding_lookup(self.char_tensor, self.model.selected)
 
+
     def Lock(self, image):
-        """Locking precomputes the adaptation for a given user."""
+
         self.session.run(self.model.decoder_cell.lock_op,
-                         {self.model.images: image[np.newaxis,:]})
+                         {self.model.images: image[np.newaxis, :]})
 
-    def ComputeVGG(self, image):
-
-        self.Lock(image)
-
-        return self.session.run(self.model.vgg_feat, {self.model.images: image[np.newaxis,:]})
 
     def MakeSession(self, threads=8):
         """Create the session with the given number of threads."""
@@ -73,7 +70,6 @@ class QACModel(object):
         self.queries = tf.placeholder(tf.int32, [None, params.max_len], name='queries')
         self.query_lengths = tf.placeholder(tf.int32, [None], name='query_lengths')
         self.dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='keep_prob')
-        self.fc_dropout_keep_prob = tf.placeholder_with_default(1.0, (), name='fc_keep_prob')
 
         x = self.queries[:, :-1]  # strip off the end of query token
         y = self.queries[:, 1:]  # need to predict y from x
@@ -96,12 +92,16 @@ class QACModel(object):
 
                 self.images = tf.placeholder(tf.float32, [None, params.img_size, params.img_size, 3])
                 if params.vgg_feat_type =='full':
-
-                    self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
+                    if training_mode:
+                        self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
                                                     apply_dropout=params.apply_dropout,
                                                     output_dim=params.image_feat_size,
                                                     initialize = False)
-
+                    else:
+                        self.vgg_feat = vgg_net.vgg_fc8(self.images, 'vgg_local',
+                                                    apply_dropout=False,
+                                                    output_dim=params.image_feat_size,
+                                                    initialize = False)
 
 
             # create a mask to zero out the loss for the padding tokens
@@ -189,35 +189,37 @@ class QACModel(object):
 
         It computes just a single step of the LSTM.
         """
-        self.prev_word = tf.placeholder(tf.int32, [None], name='prev_word')
-        self.prev_hidden_state = tf.placeholder(
-            tf.float32, [None, 2 * self.params.num_units], name='prev_hidden_state')
-        prev_c = self.prev_hidden_state[:, :self.params.num_units]
-        prev_h = self.prev_hidden_state[:, self.params.num_units:]
+        with tf.variable_scope('QAC'):
 
-        # temperature can be used to tune diversity of the decoding
-        self.temperature = tf.placeholder_with_default([1.0], [1])
+            self.prev_word = tf.placeholder(tf.int32, [None], name='prev_word')
+            self.prev_hidden_state = tf.placeholder(
+                tf.float32, [None, 2 * self.params.num_units], name='prev_hidden_state')
+            prev_c = self.prev_hidden_state[:, :self.params.num_units]
+            prev_h = self.prev_hidden_state[:, self.params.num_units:]
 
-        prev_embed = tf.nn.embedding_lookup(self.char_embeddings, self.prev_word)
+            # temperature can be used to tune diversity of the decoding
+            self.temperature = tf.placeholder_with_default([1.0], [1])
 
-        state = tf.nn.rnn_cell.LSTMStateTuple(prev_c, prev_h)
-        # result, (next_c, next_h) = self.decoder_cell(
-        #     prev_embed, state, use_locked=True)
-        result, (next_c, next_h) = self.decoder_cell(
-            prev_embed, state, use_locked=True)
+            prev_embed = tf.nn.embedding_lookup(self.char_embeddings, self.prev_word)
 
-        self.next_hidden_state = tf.concat([next_c, next_h], 1)
+            state = tf.nn.rnn_cell.LSTMStateTuple(prev_c, prev_h)
+            # result, (next_c, next_h) = self.decoder_cell(
+            #     prev_embed, state, use_locked=True)
+            result, (next_c, next_h) = self.decoder_cell(
+                prev_embed, state, use_locked=True)
 
-        with tf.variable_scope('rnn', reuse=True):
-            proj_result = tf.layers.dense(
-                result, self.params.char_embed_size, reuse=True, name='proj')
-        logits = tf.matmul(proj_result, self.char_embeddings,
-                           transpose_b=True) + self.char_bias
-        prevent_unk = tf.one_hot([0], self.params.vocab_size, -30.0)
-        self.next_prob = tf.nn.softmax(prevent_unk + logits / self.temperature)
-        self.next_log_prob = tf.nn.log_softmax(logits / self.temperature)
+            self.next_hidden_state = tf.concat([next_c, next_h], 1)
 
-        # return the top `beam_size` number of characters for use in decoding
-        self.beam_size = tf.placeholder_with_default(1, (), name='beam_size')
-        log_probs, self.selected = tf.nn.top_k(self.next_log_prob, self.beam_size)
-        self.selected_p = -log_probs  # cost is the negative log likelihood
+            with tf.variable_scope('rnn', reuse=True):
+                proj_result = tf.layers.dense(
+                    result, self.params.char_embed_size, reuse=True, name='proj')
+            logits = tf.matmul(proj_result, self.char_embeddings,
+                               transpose_b=True) + self.char_bias
+            prevent_unk = tf.one_hot([0], self.params.vocab_size, -30.0)
+            self.next_prob = tf.nn.softmax(prevent_unk + logits / self.temperature)
+            self.next_log_prob = tf.nn.log_softmax(logits / self.temperature)
+
+            # return the top `beam_size` number of characters for use in decoding
+            self.beam_size = tf.placeholder_with_default(1, (), name='beam_size')
+            log_probs, self.selected = tf.nn.top_k(self.next_log_prob, self.beam_size)
+            self.selected_p = -log_probs  # cost is the negative log likelihood

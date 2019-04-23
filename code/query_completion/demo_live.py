@@ -1,21 +1,25 @@
-from dynamic import DynamicModel
-from beam import GetCompletions, InitBeam,GetSavedKeystrokes
-from model import MetaQACModel
-import tensorflow as tf
+import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-#from AMSGrad import AMSGrad
+
+sys.path.insert(1, os.path.join(sys.path[0],'..'))
+from query_completion.beam import GetCompletions
+from query_completion.model import MetaQACModel
+from util.vgg.vgg_net import channel_mean
+
 
 print('Loading Model.....')
-m = MetaQACModel('../referit_experiment_img_4_3')
+m = MetaQACModel('query_experiment_refer')
 m.MakeSessionAndRestore(2)
 
 print('Loading Image.....')
-example_image = np.load('../data/referit/img_val/51.npy')
-vgg_feat = m.ComputeVGG(example_image)
-plt.imshow(example_image)
-plt.show(block=False)
+example_image = np.load('data/visual/processed_images_224/830.npy') #290/830/258 a, ca
+
+#Building 2567  b, ar
+#Arm/area ar
+# Bed 2106, 2132
+m.Lock(example_image-channel_mean)
 
 print('Done')
 prefix = ''
@@ -38,10 +42,11 @@ while True:
             prefix = ''
         else:
             prefix = prefix + chr(key)
+            comp_list = list(GetCompletions(['<S>'] + list(prefix), m, branching_factor=4, beam_size=100))
+            top_queries = [''.join(q.words[1:-1]) for q in comp_list[:-4:-1]]
+            #print(top_queries)
             print('Query: {0:20}  Completion: {1}'.format(
-                        prefix,
-                        ''.join(list(GetCompletions(['<S>'] + list(prefix), vgg_feat, m, branching_factor=4, beam_size=100))[-1].words[1:-1])))
-
+                        prefix,top_queries))
         #print("key:", chr(key)) # prints: 'key: 97' for 'a' pressed
                                         # '-1' on no presses
-    time.sleep(.1)
+    time.sleep(.2)
