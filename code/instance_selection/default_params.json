@@ -1,0 +1,8 @@
+{
+    "max_seq_len": 20,
+    "batch_size": 32,
+    "iters": 250000,
+    "warmup":0.1,
+    "fine_tune": true,
+    "learning_rate": 0.00005
+}

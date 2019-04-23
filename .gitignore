@@ -5,29 +5,23 @@
 *.npz
 *-checkpoint.ipynb
 *.swp
+*.pkl
 .DS_Store
 .idea/
 
 venv/
+data/referit/processed*
+data/referit/images/
+data/referit/*.txt
+data/referit/*.gz
+data/visual/images/
+data/visual/processed*
+data/visual/*.json
+data/visual/*.txt
+*experiment*/
 
-text_objseg/exp-*/data/refer*/
-text_objseg/exp-*/log/*
-#text_objseg/exp-*/results*/*
-text_objseg/exp-*/caffemodel/*
-text_objseg/exp-*/tfmodel/*
-#text_objseg/exp-*/__obsolete__/*
-text_objseg/exp-referit/referit-dataset/images
-text_objseg/exp-referit/referit-dataset/mask
-text_objseg/exp-referit/referit-dataset/*.gz
 
-
-query_completion/data/coco
-query_completion/coco*
-query_completion/g23b
-query_completion/output
-
-*.caffemodel
-*.tfmodel*
+*.zip
 
 *-Copy*.ipynb
 
