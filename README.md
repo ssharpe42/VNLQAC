@@ -1,4 +1,4 @@
-Visual Natural Language Query Auto-Completion for Estimating Instance Probabilities
+## Visual Natural Language Query Auto-Completion for Estimating Instance Probabilities
 
 -----
 Samuel Sharpe, Jin Yan, Fan Wu, Iddo Drori
