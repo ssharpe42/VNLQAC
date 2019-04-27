@@ -1,7 +1,7 @@
-Natural Language Query Auto-completion for Instance Selection
------
+Visual Natural Language Query Auto-Completion for Estimating Instance Probabilities
 
-Deep Learning Final Project 4995
+-----
+Samuel Sharpe, Jin Yan, Fan Wu, Iddo Drori
 
 A novel addition to instance segmentation methods that selects instances from the image based on auto-completed user queries conditioned on image context.
 
