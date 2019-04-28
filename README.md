@@ -53,7 +53,10 @@ Code to produce some example query completions and instance selections in `code/
 Code to produce images with selected instances adapted from Learning to Segment Everything and located here: https://github.com/jinnick/DL_project_NLQAC_Instance_Selection
 
 #### Example 
-https://github.com/ssharpe42/VNLQAC/files/3124523/example.pdf
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/8136905/56857451-d0e27600-693b-11e9-8b13-3dbe22db4402.png" style="max-width:100%;">
+</p>
 
 Aspects of code adapted from:
     
