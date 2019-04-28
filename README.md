@@ -48,7 +48,7 @@ Train: `python code/instance_selection/train.py /path/to/new/experimentdir
 
 #### Demo
 
-Code to produce query completion/instance selection images in paper located in `code/demo.ipynb`
+Code to produce some example query completions and instance selections in `code/demo.ipynb`
 
 Code to produce images with selected instances adapted from Learning to Segment Everything and located here: https://github.com/jinnick/DL_project_NLQAC_Instance_Selection
 
