@@ -23,7 +23,7 @@ class SelectionModel(object):
     def BuildGraph(self, params, training_mode=True, optimizer=None):
 
         with tf.variable_scope('Selection'):
-        #with tf.variable_scope('None'):
+
             self.prob_threshold = tf.placeholder_with_default(0.5, (), name='prob_threshold')
             self.dropout = tf.placeholder_with_default(0.9, (), name = 'dropout')
             self.input_ids = tf.placeholder(tf.int32, [None, params.max_seq_len], name='input_ids')
@@ -33,14 +33,12 @@ class SelectionModel(object):
             self.bert_module = hub.Module("https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
                                           trainable=True)
 
-            # self.pooled_output = bert_module(
-            #     dict(input_ids=np.array(f.input_ids).reshape(1, -1), input_mask=np.array(f.input_mask).reshape(1, -1),
-            #          segment_ids=np.array(f.segment_ids).reshape(1, -1)), signature='tokens', as_dict=True)
-
+            #BERT instance
             bert_output = self.bert_module(
                 dict(input_ids=self.input_ids, input_mask=self.input_mask,segment_ids=self.segment_ids),
                 signature='tokens', as_dict=True)
 
+            #Pooled Output from BERT
             output_layer = bert_output["pooled_output"]
             hidden_size = output_layer.shape[-1].value
 
@@ -61,10 +59,6 @@ class SelectionModel(object):
 
                 sigmoid_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels = self.labels, logits = logits )
 
-                # If we're predicting, we want predicted labels and the probabiltiies.
-                # if is_predicting:
-                #   return (predicted_labels, log_probs)
-
                 # If we're train/eval, compute loss between predicted and actual label
                 total_loss = tf.reduce_sum(sigmoid_loss)
                 self.avg_loss = tf.to_float(total_loss)/tf.to_float(params.batch_size)
@@ -75,9 +69,10 @@ class SelectionModel(object):
                 self.tp = true_positives(self.labels ,self.predicted_labels)
                 self.fp = false_positives(self.labels, self.predicted_labels)
                 self.fn = false_negatives(self.labels, self.predicted_labels)
-        # don't train conv layers
-        if training_mode:
 
+
+        if training_mode:
+            #Fine tune bert
             if params.fine_tune:
                 self.train_op = optimization.create_optimizer(loss=self.avg_loss,
                                                               init_lr = params.learning_rate,
@@ -85,6 +80,7 @@ class SelectionModel(object):
                                                               num_warmup_steps= int(params.iters*params.warmup),
                                                               use_tpu =False)
             else:
+                #Freeze bert
                 train_vars = [var for var in tf.trainable_variables() if
                                 var.name in ['Selection/output_weights:0', 'Selection/output_bias:0']]
                 self.train_op = optimizer.minimize(self.avg_loss, var_list=train_vars)
@@ -107,6 +103,7 @@ class MetaSelectionModel(object):
         self.indx_to_class = {self.class_indx[c]:c for c in self.class_indx}
         if not tokenizer:
             self.tokenizer = create_tokenizer_from_hub_module()
+
         # construct the tensorflow graph
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -133,6 +130,8 @@ class MetaSelectionModel(object):
 
     def predict(self, query, threshold = 0.3, top_k = None):
 
+        """Produce instance probabilities for a query"""
+
         input_features = convert_single_example(InputExample(guid=None,text_a=query,text_b=None, label=None),
                                self.params.max_seq_len, self.tokenizer)
 
@@ -154,6 +153,7 @@ class MetaSelectionModel(object):
                 over_threshold = 0
 
             return selected_classes[over_threshold], selected_probs[0][over_threshold]
+
         else:
             feed_dict[self.model.n_items] = top_k
             selected_probs, selected = self.session.run([self.model.selected_probs, self.model.selected ], feed_dict)

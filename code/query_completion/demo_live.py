@@ -15,7 +15,8 @@ m.MakeSessionAndRestore(2)
 
 print('Loading Image.....')
 example_image = np.load('data/visual/processed_images_224/830.npy') #290/830/258 a, ca
-
+plt.imshow(example_image)
+plt.show()
 #Building 2567  b, ar
 #Arm/area ar
 # Bed 2106, 2132

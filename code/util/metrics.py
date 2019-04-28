@@ -69,16 +69,6 @@ def false_negatives(labels, predictions):
     return tf.reduce_sum(tf.clip_by_value(tf.subtract(labels, predictions), 0, 1))
 
 
-#
-# def recall(labels,predictions):
-#
-#     return tf.divide(tf.reduce_sum(predictions * labels),tf.reduce_sum(labels))
-#
-#
-# def precision(labels,predictions):
-#
-#     return tf.divide(tf.reduce_sum(predictions * labels),tf.reduce_sum(predictions))
-
 def recall(tp, fn):
     if tp == 0:
         return 0

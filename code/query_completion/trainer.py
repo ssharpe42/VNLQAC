@@ -51,7 +51,7 @@ else:
 tf.set_random_seed(int(time.time() * 1000))
 
 # params = helper.GetParams(args.params, 'train', args.expdir)
-params = helper.GetParams(params, 'train', expdir)
+params = helper.GetParams(args.params, 'train', expdir)
 
 logging.basicConfig(filename=os.path.join(expdir, 'logfile.txt'),
                     level=logging.INFO)
